@@ -1,11 +1,12 @@
+from fastapi import FastAPI, HTTPException, Depends, Query, status
 from app.schemas import (
     UserRegister, UserLogin, TokenResponse, UserProfile,
     CourseCreate, CourseUpdate, CourseResponse,
-    StudySessionCreate, StudySessionResponse, SessionCreationResult
+    StudySessionCreate, StudySessionResponse, SessionCreationResult,
+    ThemeItem, ThemeActionRequest, LeaderboardUser
 )
-from typing import List, Optional
+from typing import List, Literal, Optional
 import sqlite3
-from fastapi import FastAPI, HTTPException, Depends, status
 from app.database import init_db, get_connection
 from app.schemas import UserRegister, UserLogin, TokenResponse, UserProfile
 from app.auth import hash_password, verify_password, create_access_token, get_current_user
@@ -36,6 +37,7 @@ def register(user_data: UserRegister):
             )
             conn.commit()
             new_user_id = cursor.lastrowid
+            cursor.execute("INSERT INTO user_themes (user_id, theme_id) VALUES (?, 'default')", (new_user_id,))
         except sqlite3.IntegrityError:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -322,3 +324,186 @@ def delete_study_session(
             )
 
     return {"message": f"Session {session_id} deleted successfully"}
+
+# ----------------- THEMES CATALOG -----------------
+
+AVAILABLE_THEMES = [
+    {
+        "id": "default",
+        "name": "Classic Slate",
+        "price": 0,
+        "preview_color": "#334155",
+        "description": "تم مینیمال و کلاسیک خاکستری تیره"
+    },
+    {
+        "id": "dracula",
+        "name": "Dracula Violet",
+        "price": 40,
+        "preview_color": "#7c3aed",
+        "description": "تم بنفش نئونی مناسب شب‌زنده‌داران"
+    },
+    {
+        "id": "forest_emerald",
+        "name": "Emerald Focus",
+        "price": 80,
+        "preview_color": "#059669",
+        "description": "تم سبز متمرکز الهام‌گرفته از طبیعت"
+    },
+    {
+        "id": "cyberpunk_amber",
+        "name": "Cyberpunk 2077",
+        "price": 150,
+        "preview_color": "#f59e0b",
+        "description": "تم زرد كهربایی طلایی مخصوص کاربران حرفه‌ای"
+    },
+]
+
+
+# ----------------- SHOP ENDPOINTS -----------------
+
+# ۱. دریافت لیست تمام تم‌های فروشگاه به همراه وضعیت مالکیت کاربر
+@app.get("/shop/themes", response_model=List[ThemeItem])
+def get_shop_themes(current_user: dict = Depends(get_current_user)):
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT theme_id FROM user_themes WHERE user_id = ?",
+            (current_user["id"],)
+        )
+        owned_themes = {row["theme_id"] for row in cursor.fetchall()}
+
+    results = []
+    for theme in AVAILABLE_THEMES:
+        results.append(
+            ThemeItem(
+                id=theme["id"],
+                name=theme["name"],
+                price=theme["price"],
+                preview_color=theme["preview_color"],
+                description=theme["description"],
+                is_owned=(theme["id"] in owned_themes),
+                is_active=(theme["id"] == current_user["active_theme"])
+            )
+        )
+    return results
+
+
+# ۲. خرید تم با سکه
+@app.post("/shop/buy")
+def buy_theme(
+    request: ThemeActionRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    theme = next((t for t in AVAILABLE_THEMES if t["id"] == request.theme_id), None)
+    if not theme:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Theme does not exist.")
+
+    with get_connection() as conn:
+        cursor = conn.cursor()
+
+        # بررسی اینکه آیا تم قبلاً خریداری شده یا خیر
+        cursor.execute(
+            "SELECT id FROM user_themes WHERE user_id = ? AND theme_id = ?",
+            (current_user["id"], request.theme_id)
+        )
+        if cursor.fetchone():
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You already own this theme.")
+
+        # بررسی موجودی سکه کاربر
+        cursor.execute("SELECT coins FROM users WHERE id = ?", (current_user["id"],))
+        user_coins = cursor.fetchone()["coins"]
+
+        if user_coins < theme["price"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Not enough coins. Required: {theme['price']}, Available: {user_coins}"
+            )
+
+        # کسر سکه و افزودن به دارایی‌ها
+        cursor.execute("UPDATE users SET coins = coins - ? WHERE id = ?", (theme["price"], current_user["id"]))
+        cursor.execute("INSERT INTO user_themes (user_id, theme_id) VALUES (?, ?)", (current_user["id"], request.theme_id))
+        conn.commit()
+
+        cursor.execute("SELECT coins FROM users WHERE id = ?", (current_user["id"],))
+        remaining_coins = cursor.fetchone()["coins"]
+
+    return {
+        "message": f"Theme '{theme['name']}' purchased successfully!",
+        "remaining_coins": remaining_coins,
+        "theme_id": request.theme_id
+    }
+
+
+# ۳. تجهیز و فعال‌سازی تم روی پروفایل
+@app.post("/shop/equip")
+def equip_theme(
+    request: ThemeActionRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id FROM user_themes WHERE user_id = ? AND theme_id = ?",
+            (current_user["id"], request.theme_id)
+        )
+        if not cursor.fetchone():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="You do not own this theme. Purchase it first!"
+            )
+
+        cursor.execute("UPDATE users SET active_theme = ? WHERE id = ?", (request.theme_id, current_user["id"]))
+        conn.commit()
+
+    return {"message": f"Theme '{request.theme_id}' equipped successfully!", "active_theme": request.theme_id}
+
+
+# ----------------- LEADERBOARD ENDPOINT -----------------
+
+@app.get("/leaderboard", response_model=List[LeaderboardUser])
+def get_leaderboard(
+    timeframe: Literal["daily", "weekly", "all_time"] = Query("daily", description="بازه زمانی رتبه‌بندی")
+):
+    # اعمال فیلتر بر اساس تاریخ در SQLite
+    if timeframe == "daily":
+        date_filter = "WHERE s.session_date = CURRENT_DATE"
+    elif timeframe == "weekly":
+        date_filter = "WHERE s.session_date >= date('now', '-7 days')"
+    else:
+        date_filter = ""
+
+    query = f"""
+        SELECT 
+            u.id AS user_id,
+            u.username,
+            u.active_theme,
+            COALESCE(SUM(s.duration_minutes), 0) AS total_study_minutes,
+            COALESCE(SUM(s.coins_earned), 0) AS total_coins_earned
+        FROM users u
+        LEFT JOIN study_sessions s ON u.id = s.user_id
+        {date_filter}
+        GROUP BY u.id
+        ORDER BY total_study_minutes DESC, total_coins_earned DESC
+        LIMIT 20;
+    """
+
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(query)
+        rows = cursor.fetchall()
+
+    leaderboard = []
+    for rank, row in enumerate(rows, start=1):
+        leaderboard.append(
+            LeaderboardUser(
+                rank=rank,
+                user_id=row["user_id"],
+                username=row["username"],
+                active_theme=row["active_theme"],
+                total_study_minutes=row["total_study_minutes"],
+                total_study_hours=round(row["total_study_minutes"] / 60, 1),
+                total_coins_earned=row["total_coins_earned"]
+            )
+        )
+
+    return leaderboard

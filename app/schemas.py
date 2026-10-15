@@ -67,3 +67,28 @@ class SessionCreationResult(BaseModel):
     session: StudySessionResponse
     total_user_coins: int
     message: str
+
+from typing import Literal
+
+# ----------------- SHOP & LEADERBOARD SCHEMAS -----------------
+
+class ThemeItem(BaseModel):
+    id: str
+    name: str
+    price: int
+    preview_color: str
+    description: str
+    is_owned: bool
+    is_active: bool
+
+class ThemeActionRequest(BaseModel):
+    theme_id: str = Field(min_length=2, max_length=30)
+
+class LeaderboardUser(BaseModel):
+    rank: int
+    user_id: int
+    username: str
+    active_theme: str
+    total_study_minutes: int
+    total_study_hours: float
+    total_coins_earned: int

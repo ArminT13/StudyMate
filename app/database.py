@@ -57,4 +57,22 @@ def init_db():
             );
         """)
 
+        # 4. User Themes Inventory (تم‌های خریداری شده توسط هر کاربر)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS user_themes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                theme_id TEXT NOT NULL,
+                purchased_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(user_id, theme_id),
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+        """)
+
+        # اطمینان از داشتن تم پیش‌فرض برای همه کاربران
+        cursor.execute("""
+            INSERT OR IGNORE INTO user_themes (user_id, theme_id)
+            SELECT id, 'default' FROM users;
+        """)
+
         conn.commit()
