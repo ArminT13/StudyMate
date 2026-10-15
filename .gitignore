@@ -1,5 +1,18 @@
+# فایل‌های متغیرهای محیطی و سکرت‌ها
+.env
+.env.*
+*.env
+
+# محیط مجازی پایتون
 venv/
+.venv/
+env/
+
+# فایل‌های کش پایتون
 __pycache__/
 *.pyc
-*.db
-.env
+
+# دیتابیس لوکال
+studymate.db
+studymate.db-journal
+studymate.db-wal

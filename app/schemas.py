@@ -127,3 +127,40 @@ class GroupDetail(BaseModel):
     owner_id: int
     member_count: int
     members: List[GroupMemberItem]
+
+# ----------------- AI STUDY COACH SCHEMAS -----------------
+
+class AICoachRequest(BaseModel):
+    goal_title: str = Field(min_length=2, max_length=100, example="امتحان پایان‌ترم هوش مصنوعی")
+    target_date: date = Field(example="2026-11-20", description="تاریخ هدف یا موعد امتحان")
+    daily_hours: float = Field(gt=0.5, le=14.0, example=3.5, description="ساعت مطالعه مفید در هر روز")
+    topics: List[str] = Field(min_length=1, max_length=15, example=["جستجوی آگاهانه و A*", "الگوریتم‌های ژنتیک", "شبکه‌های عصبی"])
+    notes: Optional[str] = Field(default=None, max_length=300, example="روی فصل شبکه‌های عصبی ضعف دارم")
+
+class PlanDaySchedule(BaseModel):
+    day_number: int
+    date: str
+    focus_topic: str
+    pomodoro_blocks: int
+    daily_study_hours: float
+    potential_coins: int
+    action_item: str
+
+class AICoachPlan(BaseModel):
+    id: Optional[int] = None
+    goal_title: str
+    target_date: str
+    days_remaining: int
+    daily_hours: float
+    total_planned_hours: float
+    total_potential_coins: int
+    motivational_quote: str
+    schedule: List[PlanDaySchedule]
+    strategy_advice: str
+
+class SavedPlanSummary(BaseModel):
+    id: int
+    goal_title: str
+    target_date: str
+    daily_hours: float
+    created_at: str

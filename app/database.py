@@ -4,10 +4,11 @@ import os
 DB_PATH = os.path.join(os.path.dirname(__file__), "studymate.db")
 
 def get_connection():
-    """Create and return a SQLite connection with foreign keys enabled."""
-    conn = sqlite3.connect(DB_PATH)
+    """Create and return a SQLite connection with WAL mode and foreign keys enabled."""
+    conn = sqlite3.connect(DB_PATH, timeout=10.0)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON;")
+    conn.execute("PRAGMA journal_mode = WAL;")
     return conn
 
 def init_db():
@@ -97,6 +98,20 @@ def init_db():
                 joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(group_id, user_id),
                 FOREIGN KEY (group_id) REFERENCES study_groups(id) ON DELETE CASCADE,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+        """)
+
+        # 7. AI Study Plans Table (ذخیره برنامه‌های هوشمند ایجاد شده)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS ai_plans (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                goal_title TEXT NOT NULL,
+                target_date DATE NOT NULL,
+                daily_hours REAL NOT NULL,
+                plan_json TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             );
         """)

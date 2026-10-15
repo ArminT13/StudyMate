@@ -1,12 +1,15 @@
+from datetime import date
 import secrets
 import string
-
+import json
+from app.ai_coach import generate_study_plan
 from app.schemas import (
     UserRegister, UserLogin, TokenResponse, UserProfile,
     CourseCreate, CourseUpdate, CourseResponse,
     StudySessionCreate, StudySessionResponse, SessionCreationResult,
     ThemeItem, ThemeActionRequest, LeaderboardUser,
-    GroupCreate, GroupJoin, GroupSummary, GroupDetail, GroupMemberItem
+    GroupCreate, GroupJoin, GroupSummary, GroupDetail, GroupMemberItem,
+    AICoachRequest, AICoachPlan, SavedPlanSummary
 )
 from fastapi import FastAPI, HTTPException, Depends, Query, status
 from typing import List, Literal, Optional
@@ -39,9 +42,12 @@ def register(user_data: UserRegister):
                 "INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)",
                 (user_data.username, user_data.email, hashed_pwd)
             )
-            conn.commit()
             new_user_id = cursor.lastrowid
-            cursor.execute("INSERT INTO user_themes (user_id, theme_id) VALUES (?, 'default')", (new_user_id,))
+            cursor.execute(
+                "INSERT INTO user_themes (user_id, theme_id) VALUES (?, 'default')",
+                (new_user_id,)
+            )
+            conn.commit()  # هر دو با هم کامیت می‌شوند
         except sqlite3.IntegrityError:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -726,3 +732,124 @@ def leave_group(
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You are not a member of this group.")
 
     return {"message": "Successfully left the group."}
+
+# ----------------- AI STUDY COACH ENDPOINTS -----------------
+
+# ۱. تولید و ذخیره برنامه درسی هوشمند
+@app.post("/ai/generate-plan", response_model=AICoachPlan, status_code=status.HTTP_201_CREATED)
+async def create_ai_study_plan(
+    req: AICoachRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    if req.target_date <= date.today():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Target date must be in the future."
+        )
+
+    # فراخوانی ماژول هوش مصنوعی
+    plan_data = await generate_study_plan(
+        goal_title=req.goal_title,
+        target_date=req.target_date,
+        daily_hours=req.daily_hours,
+        topics=req.topics,
+        notes=req.notes
+    )
+
+    # ذخیره برنامه در دیتابیس اختصاصی کاربر
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO ai_plans (user_id, goal_title, target_date, daily_hours, plan_json)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                current_user["id"],
+                req.goal_title,
+                str(req.target_date),
+                req.daily_hours,
+                json.dumps(plan_data, ensure_ascii=False)
+            )
+        )
+        conn.commit()
+        plan_id = cursor.lastrowid
+
+    plan_data["id"] = plan_id
+    return plan_data
+
+
+# ۲. دریافت لیست برنامه‌های ذخیره‌شده کاربر
+@app.get("/ai/plans", response_model=List[SavedPlanSummary])
+def get_user_plans(current_user: dict = Depends(get_current_user)):
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT id, goal_title, target_date, daily_hours, created_at 
+            FROM ai_plans 
+            WHERE user_id = ? 
+            ORDER BY id DESC
+            """,
+            (current_user["id"],)
+        )
+        rows = cursor.fetchall()
+
+    return [
+        SavedPlanSummary(
+            id=row["id"],
+            goal_title=row["goal_title"],
+            target_date=str(row["target_date"]),
+            daily_hours=row["daily_hours"],
+            created_at=str(row["created_at"])
+        )
+        for row in rows
+    ]
+
+
+# ۳. دریافت جزئیات کامل یک برنامه مشخص
+@app.get("/ai/plans/{plan_id}", response_model=AICoachPlan)
+def get_plan_by_id(
+    plan_id: int,
+    current_user: dict = Depends(get_current_user)
+):
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id, plan_json FROM ai_plans WHERE id = ? AND user_id = ?",
+            (plan_id, current_user["id"])
+        )
+        row = cursor.fetchone()
+
+        if not row:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Study plan not found or you don't have access to it."
+            )
+
+    plan_dict = json.loads(row["plan_json"])
+    plan_dict["id"] = row["id"]
+    return plan_dict
+
+
+# ۴. حذف برنامه درسی
+@app.delete("/ai/plans/{plan_id}", status_code=status.HTTP_200_OK)
+def delete_plan(
+    plan_id: int,
+    current_user: dict = Depends(get_current_user)
+):
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "DELETE FROM ai_plans WHERE id = ? AND user_id = ?",
+            (plan_id, current_user["id"])
+        )
+        conn.commit()
+
+        if cursor.rowcount == 0:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Plan not found or access denied."
+            )
+
+    return {"message": f"Plan {plan_id} deleted successfully."}
