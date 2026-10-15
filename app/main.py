@@ -9,7 +9,8 @@ from app.schemas import (
     StudySessionCreate, StudySessionResponse, SessionCreationResult,
     ThemeItem, ThemeActionRequest, LeaderboardUser,
     GroupCreate, GroupJoin, GroupSummary, GroupDetail, GroupMemberItem,
-    AICoachRequest, AICoachPlan, SavedPlanSummary
+    AICoachRequest, AICoachPlan, SavedPlanSummary,
+    PomodoroStartRequest, PomodoroFinishRequest, PomodoroSessionResponse  # <-- اضافه شد
 )
 from fastapi import FastAPI, HTTPException, Depends, Query, status
 from typing import List, Literal, Optional
@@ -853,3 +854,97 @@ def delete_plan(
             )
 
     return {"message": f"Plan {plan_id} deleted successfully."}
+
+from datetime import datetime
+import math
+
+# ----------------- POMODORO TIMER ENDPOINTS -----------------
+
+@app.post("/pomodoro/start", response_model=PomodoroSessionResponse, status_code=status.HTTP_201_CREATED)
+def start_pomodoro_session(
+    payload: PomodoroStartRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """ثبت شروع تایمر تمرکز پومودورو"""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO pomodoro_sessions (user_id, topic, target_minutes, status, started_at)
+            VALUES (?, ?, ?, 'in_progress', datetime('now'))
+            """,
+            (current_user["id"], payload.topic, payload.target_minutes)
+        )
+        conn.commit()
+        session_id = cursor.lastrowid
+
+        cursor.execute("SELECT * FROM pomodoro_sessions WHERE id = ?", (session_id,))
+        new_session = cursor.fetchone()
+
+    return dict(new_session)
+
+
+@app.post("/pomodoro/{session_id}/complete", response_model=PomodoroSessionResponse)
+def complete_pomodoro_session(
+    session_id: int,
+    payload: PomodoroFinishRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """اتمام جلسه تمرکز و واریز ۱۰ سکه به ازای هر ۲۵ دقیقه تمرکز"""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT * FROM pomodoro_sessions WHERE id = ? AND user_id = ?",
+            (session_id, current_user["id"])
+        )
+        session = cursor.fetchone()
+        if not session:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="جلسه مطالعه یافت نشد."
+            )
+
+        session_dict = dict(session)
+        if session_dict["status"] == "completed":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="این جلسه قبلاً ثبت نهایی شده است."
+            )
+
+        # محاسبه مدت زمان
+        actual_min = payload.actual_minutes or session_dict["target_minutes"]
+
+        # هر ۲۵ دقیقه مطالعه = ۱۰ سکه
+        coins_earned = (actual_min // 25) * 10
+        if coins_earned == 0 and actual_min >= 20:
+            coins_earned = 10  # پاداش برای جلسات بالای ۲۰ دقیقه
+
+        # به‌روزرسانی جلسه پومودورو
+        cursor.execute(
+            """
+            UPDATE pomodoro_sessions
+            SET actual_minutes = ?,
+                coins_earned = ?,
+                status = 'completed',
+                ended_at = datetime('now')
+            WHERE id = ?
+            """,
+            (actual_min, coins_earned, session_id)
+        )
+
+        # افزایش موجودی سکه کاربر در جدول users
+        cursor.execute(
+            "UPDATE users SET coins = coins + ? WHERE id = ?",
+            (coins_earned, current_user["id"])
+        )
+
+        # دریافت موجودی جدید سکه‌ها
+        cursor.execute("SELECT coins FROM users WHERE id = ?", (current_user["id"],))
+        updated_coins = cursor.fetchone()["coins"]
+        conn.commit()
+
+        cursor.execute("SELECT * FROM pomodoro_sessions WHERE id = ?", (session_id,))
+        final_session = dict(cursor.fetchone())
+        final_session["user_total_coins"] = updated_coins
+
+    return final_session

@@ -16,7 +16,7 @@ def init_db():
     with get_connection() as conn:
         cursor = conn.cursor()
 
-        # 1. Users Table (با سکه اولیه و تم پروفایل)
+        # 1. Users Table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -29,7 +29,7 @@ def init_db():
             );
         """)
 
-        # 2. Courses Table (وابسته به هر کاربر)
+        # 2. Courses Table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS courses (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -42,7 +42,7 @@ def init_db():
             );
         """)
 
-        # 3. Study Sessions Table (ثبت بازه‌های مطالعه)
+        # 3. Study Sessions Table (ثبت دستی جلسات درس‌های انتخابی)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS study_sessions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -58,7 +58,7 @@ def init_db():
             );
         """)
 
-        # 4. User Themes Inventory (تم‌های خریداری شده توسط هر کاربر)
+        # 4. User Themes Inventory
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS user_themes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -70,7 +70,6 @@ def init_db():
             );
         """)
 
-        # اطمینان از داشتن تم پیش‌فرض برای همه کاربران
         cursor.execute("""
             INSERT OR IGNORE INTO user_themes (user_id, theme_id)
             SELECT id, 'default' FROM users;
@@ -89,7 +88,7 @@ def init_db():
             );
         """)
 
-        # 6. Group Members Table (رابطه چند به چند بین کاربران و گروه‌ها)
+        # 6. Group Members Table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS group_members (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -102,7 +101,7 @@ def init_db():
             );
         """)
 
-        # 7. AI Study Plans Table (ذخیره برنامه‌های هوشمند ایجاد شده)
+        # 7. AI Study Plans Table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS ai_plans (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -112,6 +111,22 @@ def init_db():
                 daily_hours REAL NOT NULL,
                 plan_json TEXT NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+        """)
+
+        # 8. Pomodoro Sessions Table (تایمر زنده و تمرکز با پاداش سکه)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS pomodoro_sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                topic TEXT,
+                target_minutes INTEGER DEFAULT 25,
+                actual_minutes INTEGER DEFAULT 0,
+                coins_earned INTEGER DEFAULT 0,
+                status TEXT DEFAULT 'in_progress', -- 'in_progress', 'completed', 'abandoned'
+                started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                ended_at TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             );
         """)

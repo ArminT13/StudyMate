@@ -164,3 +164,27 @@ class SavedPlanSummary(BaseModel):
     target_date: str
     daily_hours: float
     created_at: str
+
+from datetime import datetime
+from typing import Optional
+from pydantic import BaseModel, Field
+
+# ----------------- POMODORO TIMER SCHEMAS -----------------
+
+class PomodoroStartRequest(BaseModel):
+    topic: Optional[str] = Field(None, max_length=100, description="موضوع اختیاری پومودورو", example="حل مسائل جستجوی آگاهانه")
+    target_minutes: int = Field(25, ge=1, le=180, description="مدت زمان هدف به دقیقه (پیش‌فرض ۲۵)", example=25)
+
+class PomodoroFinishRequest(BaseModel):
+    actual_minutes: Optional[int] = Field(None, ge=1, le=300, description="مدت واقعی مطالعه در صورت تغییر توسط کلاینت")
+
+class PomodoroSessionResponse(BaseModel):
+    id: int
+    topic: Optional[str]
+    target_minutes: int
+    actual_minutes: int
+    coins_earned: int
+    status: str
+    started_at: str
+    ended_at: Optional[str]
+    user_total_coins: Optional[int] = None
