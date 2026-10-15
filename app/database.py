@@ -158,4 +158,31 @@ def init_db():
             );
         """)
 
+        # 10. Group Boss Raids Table (باس‌فایت‌های تیمی)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS group_raids (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                group_id INTEGER NOT NULL,
+                boss_name TEXT NOT NULL,
+                max_hp INTEGER NOT NULL,
+                current_hp INTEGER NOT NULL,
+                reward_coins INTEGER DEFAULT 100,
+                status TEXT DEFAULT 'active', -- 'active', 'defeated'
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (group_id) REFERENCES study_groups(id) ON DELETE CASCADE
+            );
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS raid_contributions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                raid_id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
+                damage_dealt INTEGER DEFAULT 0,
+                UNIQUE(raid_id, user_id),
+                FOREIGN KEY (raid_id) REFERENCES group_raids(id) ON DELETE CASCADE,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+        """)
+
         conn.commit()

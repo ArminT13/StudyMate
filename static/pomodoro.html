@@ -1,0 +1,216 @@
+﻿<!DOCTYPE html>
+<html lang="fa" dir="rtl" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StudyMate | Pomodoro Timer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { darkMode: 'class' };
+    </script>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body class="pb-16">
+
+    <main class="max-w-4xl mx-auto px-4 sm:px-6 pt-8">
+        <div class="glass-card p-6 sm:p-10 text-center space-y-8">
+            <div>
+                <h1 data-i18n="pomo_title" class="text-3xl font-black">تایمر تمرکز پومودورو</h1>
+                <p data-i18n="pomo_subtitle" class="text-slate-500 dark:text-slate-400 text-sm mt-2">
+                    به ازای هر ۲۵ دقیقه تمرکز کامل، ۱۰ سکه طلایی و استریک روزانه دریافت کن!
+                </p>
+            </div>
+
+            <!-- Preset Time Pills -->
+            <div class="flex flex-wrap items-center justify-center gap-3">
+                <button onclick="setTargetMinutes(25)" id="preset-25" class="px-5 py-2 rounded-xl font-bold text-sm btn-accent">
+                    25 Min (+10 🪙)
+                </button>
+                <button onclick="setTargetMinutes(50)" id="preset-50" class="px-5 py-2 rounded-xl font-bold text-sm border border-slate-300 dark:border-slate-700 hover:border-accent">
+                    50 Min (+20 🪙)
+                </button>
+                <button onclick="setTargetMinutes(75)" id="preset-75" class="px-5 py-2 rounded-xl font-bold text-sm border border-slate-300 dark:border-slate-700 hover:border-accent">
+                    75 Min (+30 🪙)
+                </button>
+                <div class="flex items-center gap-2 bg-slate-100 dark:bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700">
+                    <span data-i18n="pomo_custom_min" class="text-xs text-slate-400">زمان دلخواه:</span>
+                    <input type="number" id="custom-min-input" min="1" max="180" value="25" onchange="setTargetMinutes(this.value)" class="w-14 bg-transparent text-center font-bold text-sm focus:outline-none">
+                </div>
+            </div>
+
+            <!-- Optional Topic Input -->
+            <div class="max-w-md mx-auto text-right">
+                <label data-i18n="pomo_topic_label" class="block text-xs font-bold text-slate-400 mb-1.5">موضوع مطالعه (اختیاری)</label>
+                <input type="text" id="pomo-topic" data-i18n-ph="pomo_topic_ph" placeholder="مثلاً: حل مسائل الگوریتم A*..." class="w-full px-4 py-3 rounded-xl bg-slate-100 dark:bg-slate-800/90 border border-slate-300 dark:border-slate-700 text-sm focus:outline-none focus:border-accent">
+            </div>
+
+            <!-- SVG Progress Ring -->
+            <div class="relative w-72 h-72 sm:w-80 sm:h-80 mx-auto flex items-center justify-center">
+                <svg class="pomodoro-svg w-full h-full" viewBox="0 0 260 260">
+                    <circle class="pomodoro-ring-bg" cx="130" cy="130" r="112" stroke-width="12" fill="transparent"></circle>
+                    <circle id="pomo-ring-circle" class="pomodoro-ring-progress" cx="130" cy="130" r="112" stroke-width="12" fill="transparent"
+                        stroke-dasharray="703.7" stroke-dashoffset="0"></circle>
+                </svg>
+                <div class="absolute inset-0 flex flex-col items-center justify-center">
+                    <span id="pomo-time-display" class="text-5xl sm:text-6xl font-black tracking-wider font-mono">25:00</span>
+                    <span id="pomo-percent-badge" class="mt-2 text-xs font-bold px-3 py-1 rounded-full bg-indigo-500/10 text-accent">0% تکمیل شده</span>
+                    <span id="pomo-status-text" data-i18n="pomo_status_ready" class="mt-2 text-xs text-slate-400">آماده برای شروع تمرکز</span>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex flex-wrap items-center justify-center gap-4">
+                <button id="btn-start" onclick="startPomodoro()" data-i18n="pomo_start" class="btn-accent px-8 py-4 rounded-2xl text-base font-extrabold">
+                    شروع تمرکز 🚀
+                </button>
+                <button id="btn-pause" onclick="togglePausePomodoro()" data-i18n="pomo_pause" class="hidden px-6 py-4 rounded-2xl text-base font-bold bg-amber-500 text-white">
+                    توقف موقت ⏸️
+                </button>
+                <button id="btn-complete-early" onclick="finishPomodoroSession()" data-i18n="pomo_complete_now" class="hidden px-6 py-4 rounded-2xl text-base font-bold bg-emerald-600 text-white hover:bg-emerald-500 transition">
+                    ثبت و دریافت سکه ✅
+                </button>
+                <button id="btn-reset" onclick="resetPomodoro()" data-i18n="pomo_reset" class="px-5 py-4 rounded-2xl text-sm font-bold border border-slate-300 dark:border-slate-700 hover:border-red-400">
+                    ریست 🔄
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <script src="/static/js/i18n.js"></script>
+    <script src="/static/js/theme.js"></script>
+    <script src="/static/js/api.js"></script>
+    <script>
+        injectSharedLayout("pomodoro");
+
+        const FULL_DASH_ARRAY = 703.7; // 2 * PI * 112
+        let targetMinutes = 25;
+        let totalSeconds = 25 * 60;
+        let remainingSeconds = 25 * 60;
+        let timerInterval = null;
+        let isPaused = false;
+        let activeSessionId = null;
+
+        function setTargetMinutes(mins) {
+            if (timerInterval) return;
+            targetMinutes = Math.max(1, Math.min(180, parseInt(mins) || 25));
+            document.getElementById("custom-min-input").value = targetMinutes;
+            totalSeconds = targetMinutes * 60;
+            remainingSeconds = totalSeconds;
+
+            [25, 50, 75].forEach(p => {
+                const btn = document.getElementById(`preset-${p}`);
+                if (btn) {
+                    btn.className = (p === targetMinutes)
+                        ? "px-5 py-2 rounded-xl font-bold text-sm btn-accent"
+                        : "px-5 py-2 rounded-xl font-bold text-sm border border-slate-300 dark:border-slate-700 hover:border-accent";
+                }
+            });
+
+            updateTimerUI();
+        }
+
+        function updateTimerUI() {
+            const mins = Math.floor(remainingSeconds / 60).toString().padStart(2, "0");
+            const secs = (remainingSeconds % 60).toString().padStart(2, "0");
+            document.getElementById("pomo-time-display").textContent = `${mins}:${secs}`;
+
+            const elapsed = totalSeconds - remainingSeconds;
+            const percent = totalSeconds > 0 ? Math.round((elapsed / totalSeconds) * 100) : 0;
+            document.getElementById("pomo-percent-badge").textContent = `${percent}%`;
+
+            // حلقه از خالی به پر یا برعکس (نوار لودینگ پرشونده)
+            const offset = FULL_DASH_ARRAY - (elapsed / totalSeconds) * FULL_DASH_ARRAY;
+            document.getElementById("pomo-ring-circle").style.strokeDashoffset = offset;
+        }
+
+        async function startPomodoro() {
+            const topic = document.getElementById("pomo-topic").value.trim() || "مطالعه متمرکز";
+            try {
+                const session = await apiRequest("/pomodoro/start", {
+                    method: "POST",
+                    body: JSON.stringify({ topic, target_minutes: targetMinutes })
+                });
+                activeSessionId = session.id;
+
+                document.getElementById("btn-start").classList.add("hidden");
+                document.getElementById("btn-pause").classList.remove("hidden");
+                document.getElementById("btn-complete-early").classList.remove("hidden");
+                document.getElementById("pomo-topic").disabled = true;
+                document.getElementById("pomo-status-text").textContent = t("pomo_status_running");
+
+                // شروع حلقه از صفر درصد و پر شدن تدریجی
+                document.getElementById("pomo-ring-circle").style.strokeDashoffset = FULL_DASH_ARRAY;
+
+                timerInterval = setInterval(() => {
+                    if (!isPaused) {
+                        remainingSeconds--;
+                        updateTimerUI();
+                        if (remainingSeconds <= 0) {
+                            clearInterval(timerInterval);
+                            timerInterval = null;
+                            finishPomodoroSession();
+                        }
+                    }
+                }, 1000);
+            } catch (err) {
+                showToast(err.message, "error");
+            }
+        }
+
+        function togglePausePomodoro() {
+            isPaused = !isPaused;
+            const pauseBtn = document.getElementById("btn-pause");
+            pauseBtn.textContent = isPaused ? t("pomo_resume") : t("pomo_pause");
+        }
+
+        async function finishPomodoroSession() {
+            if (!activeSessionId) return;
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+
+            const elapsedMinutes = Math.max(1, Math.round((totalSeconds - remainingSeconds) / 60)) || targetMinutes;
+            // اگر تایمر کامل تمام شده یا کاربر برای تست دکمه ثبت را زده، کل زمان هدف لحاظ شود
+            const reportedMinutes = remainingSeconds === 0 ? targetMinutes : targetMinutes;
+
+            try {
+                const res = await apiRequest(`/pomodoro/${activeSessionId}/complete`, {
+                    method: "POST",
+                    body: JSON.stringify({ actual_minutes: reportedMinutes })
+                });
+
+                document.getElementById("pomo-status-text").textContent = t("pomo_status_done");
+                triggerCoinCelebration(res.coins_earned);
+                showToast(`تبریک! جلسه ثبت شد و ${res.coins_earned} سکه طلایی دریافت کردید! 🪙`);
+
+                activeSessionId = null;
+                await syncHeaderUserStats();
+                resetPomodoro(false);
+            } catch (err) {
+                showToast(err.message, "error");
+            }
+        }
+
+        function resetPomodoro(resetStatus = true) {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+            isPaused = false;
+            remainingSeconds = totalSeconds;
+            document.getElementById("btn-start").classList.remove("hidden");
+            document.getElementById("btn-pause").classList.add("hidden");
+            document.getElementById("btn-complete-early").classList.add("hidden");
+            document.getElementById("pomo-topic").disabled = false;
+            if (resetStatus) {
+                document.getElementById("pomo-status-text").textContent = t("pomo_status_ready");
+            }
+            updateTimerUI();
+        }
+
+        // مقداردهی اولیه تاریخ و UI
+        updateTimerUI();
+    </script>
+</body>
+</html>

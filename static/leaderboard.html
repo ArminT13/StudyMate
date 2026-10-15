@@ -1,0 +1,194 @@
+﻿<!DOCTYPE html>
+<html lang="fa" dir="rtl" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StudyMate | Leaderboard & Study Groups</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { darkMode: 'class' };
+    </script>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body class="pb-16">
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 pt-8">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+
+            <!-- Leaderboard Section (7 cols) -->
+            <div class="lg:col-span-7 glass-card p-6 sm:p-8 space-y-6">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <h1 data-i18n="lb_title" class="text-2xl font-black">جدول رتبه‌بندی قهرمانان مطالعه</h1>
+                    <div class="flex gap-1.5 bg-slate-200/70 dark:bg-slate-800 p-1 rounded-xl">
+                        <button onclick="loadLeaderboard('daily')" id="tf-daily" data-i18n="lb_daily" class="px-3 py-1.5 rounded-lg text-xs font-bold btn-accent">امروز</button>
+                        <button onclick="loadLeaderboard('weekly')" id="tf-weekly" data-i18n="lb_weekly" class="px-3 py-1.5 rounded-lg text-xs font-bold">هفتگی</button>
+                        <button onclick="loadLeaderboard('all_time')" id="tf-all_time" data-i18n="lb_all_time" class="px-3 py-1.5 rounded-lg text-xs font-bold">کل زمان‌ها</button>
+                    </div>
+                </div>
+
+                <div id="leaderboard-list" class="space-y-3"></div>
+            </div>
+
+            <!-- Study Groups Section (5 cols) -->
+            <div class="lg:col-span-5 space-y-6">
+                <!-- Create or Join Group -->
+                <div class="glass-card p-6 space-y-5">
+                    <h2 data-i18n="groups_title" class="text-xl font-black">گروه‌های مطالعه من</h2>
+
+                    <!-- Create Group Form -->
+                    <form onsubmit="handleCreateGroup(event)" class="space-y-2.5">
+                        <input type="text" id="group-name" required data-i18n-ph="group_name_ph" placeholder="نام گروه (مثلاً تیم هوش مصنوعی)" class="w-full px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-sm">
+                        <input type="text" id="group-desc" data-i18n-ph="group_desc_ph" placeholder="توضیحات کوتاه هدف گروه" class="w-full px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-sm">
+                        <button type="submit" data-i18n="group_create_btn" class="w-full btn-accent py-2.5 rounded-xl text-sm font-bold">+ ساخت گروه جدید</button>
+                    </form>
+
+                    <!-- Join Group Form -->
+                    <form onsubmit="handleJoinGroup(event)" class="flex gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+                        <input type="text" id="group-code" required data-i18n-ph="group_code_ph" placeholder="کد دعوت (مثلاً SM-7X8K2)" class="flex-1 px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-sm uppercase">
+                        <button type="submit" data-i18n="group_join_btn" class="px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-500">عضویت</button>
+                    </form>
+                </div>
+
+                <!-- My Groups List -->
+                <div id="my-groups-list" class="space-y-4"></div>
+            </div>
+        </div>
+    </main>
+
+    <script src="/static/js/i18n.js"></script>
+    <script src="/static/js/theme.js"></script>
+    <script src="/static/js/api.js"></script>
+    <script>
+        injectSharedLayout("leaderboard");
+
+        async function loadLeaderboard(timeframe = "all_time") {
+            ["daily", "weekly", "all_time"].forEach(tf => {
+                const btn = document.getElementById(`tf-${tf}`);
+                if (btn) {
+                    btn.className = (tf === timeframe)
+                        ? "px-3 py-1.5 rounded-lg text-xs font-bold btn-accent"
+                        : "px-3 py-1.5 rounded-lg text-xs font-bold text-slate-400";
+                }
+            });
+
+            try {
+                const rows = await apiRequest(`/leaderboard?timeframe=${timeframe}`);
+                const container = document.getElementById("leaderboard-list");
+
+                if (rows.length === 0) {
+                    container.innerHTML = `<p class="text-sm text-slate-400 py-4">هنوز داده‌ای در این بازه ثبت نشده است.</p>`;
+                    return;
+                }
+
+                container.innerHTML = rows.map(u => {
+                    const medal = u.rank === 1 ? "🥇" : u.rank === 2 ? "🥈" : u.rank === 3 ? "🥉" : `#${u.rank}`;
+                    const themeLabel = THEME_NAMES[u.active_theme] || "Classic Slate";
+
+                    return `
+                        <div class="p-4 rounded-2xl flex items-center justify-between gap-4 text-white transition transform hover:scale-[1.01] ${getProfileThemeClass(u.active_theme)}">
+                            <div class="flex items-center gap-3.5">
+                                <span class="text-2xl font-black w-8 text-center">${medal}</span>
+                                <div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="font-extrabold text-base">${u.username}</span>
+                                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-black/30 backdrop-blur-sm font-semibold">🎨 ${themeLabel}</span>
+                                    </div>
+                                    <p class="text-xs opacity-85 mt-0.5">⏱️ ${u.total_study_hours} ساعت مطالعه (${u.total_study_minutes} دقیقه)</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <span class="px-3 py-1.5 rounded-xl bg-black/30 backdrop-blur-md font-black text-sm">
+                                    ${u.total_coins_earned} 🪙
+                                </span>
+                            </div>
+                        </div>
+                    `;
+                }).join("");
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        async function loadMyGroups() {
+            if (!getToken()) return;
+            try {
+                const groups = await apiRequest("/groups/my");
+                const container = document.getElementById("my-groups-list");
+                if (groups.length === 0) {
+                    container.innerHTML = `<div class="glass-card p-5 text-xs text-slate-400">هنوز عضو هیچ گروه مطالعه‌ای نیستید.</div>`;
+                    return;
+                }
+
+                const detailedGroups = await Promise.all(groups.map(g => apiRequest(`/groups/${g.id}`)));
+                container.innerHTML = detailedGroups.map(g => `
+                    <div class="glass-card p-5 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h3 class="font-extrabold text-base">${g.name}</h3>
+                                <p class="text-xs text-slate-400">${g.description || ''}</p>
+                            </div>
+                            <span onclick="navigator.clipboard.writeText('${g.invite_code}'); showToast('کد دعوت کپی شد! 📋')"
+                                class="cursor-pointer text-xs font-mono font-bold px-3 py-1 rounded-lg bg-indigo-500/10 border border-accent text-accent" title="کلیک برای کپی">
+                                🔗 ${g.invite_code}
+                            </span>
+                        </div>
+                        <div class="space-y-1.5 pt-2 border-t border-slate-200 dark:border-slate-800">
+                            ${g.members.map((m, idx) => `
+                                <div class="flex items-center justify-between text-xs p-2 rounded-lg text-white ${getProfileThemeClass(m.active_theme)}">
+                                    <span class="font-bold">${idx + 1}. ${m.username}${m.is_owner ? '👑' : ''}</span>
+                                    <span>${m.total_study_hours}h (${m.total_study_minutes}m)</span>
+                                </div>
+                            `).join("")}
+                        </div>
+                    </div>
+                `).join("");
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        async function handleCreateGroup(e) {
+            e.preventDefault();
+            const name = document.getElementById("group-name").value.trim();
+            const description = document.getElementById("group-desc").value.trim();
+            try {
+                await apiRequest("/groups", {
+                    method: "POST",
+                    body: JSON.stringify({ name, description })
+                });
+                document.getElementById("group-name").value = "";
+                document.getElementById("group-desc").value = "";
+                showToast(`گروه «${name}» ساخته شد!`);
+                await loadMyGroups();
+            } catch (err) {
+                showToast(err.message, "error");
+            }
+        }
+
+        async function handleJoinGroup(e) {
+            e.preventDefault();
+            const invite_code = document.getElementById("group-code").value.trim();
+            try {
+                const res = await apiRequest("/groups/join", {
+                    method: "POST",
+                    body: JSON.stringify({ invite_code })
+                });
+                document.getElementById("group-code").value = "";
+                showToast(res.message);
+                await loadMyGroups();
+            } catch (err) {
+                showToast(err.message, "error");
+            }
+        }
+
+        window.addEventListener("authSuccess", () => {
+            loadLeaderboard("all_time");
+            loadMyGroups();
+        });
+        window.addEventListener("DOMContentLoaded", () => {
+            loadLeaderboard("all_time");
+            loadMyGroups();
+        });
+    </script>
+</body>
+</html>

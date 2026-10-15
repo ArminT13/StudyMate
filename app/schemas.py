@@ -1,5 +1,8 @@
 from pydantic import BaseModel, EmailStr, Field
 from datetime import date
+from typing import List, Optional, Literal
+
+# ----------------- AUTH & USER SCHEMAS -----------------
 
 class UserRegister(BaseModel):
     username: str = Field(min_length=3, max_length=30)
@@ -21,14 +24,33 @@ class UserProfile(BaseModel):
     coins: int
     active_theme: str
 
-from typing import List, Optional
+class PublicUserProfile(BaseModel):
+    user_id: int
+    username: str
+    active_theme: str
+    theme_name: str
+    theme_name_fa: str
+    rarity: str
+    inspiration: str
+    level: int
+    xp: int
+    next_level_xp: int
+    title: str
+    title_fa: str
+    coins: int
+    current_streak: int
+    total_pomodoros: int
+    total_study_minutes: int
+    total_study_hours: float
+    total_raid_damage: int
+    created_at: str
 
 # ----------------- COURSE SCHEMAS -----------------
 
 class CourseCreate(BaseModel):
-    name: str = Field(min_length=1, max_length=100, example="ساختمان داده")
-    color: str = Field(default="#6366f1", pattern=r"^#([A-Fa-f0-9]{6})$", example="#6366f1")
-    weekly_goal_hours: float = Field(default=5.0, gt=0, le=100.0, example=6.0)
+    name: str = Field(min_length=1, max_length=100)
+    color: str = Field(default="#6366f1", pattern=r"^#([A-Fa-f0-9]{6})$")
+    weekly_goal_hours: float = Field(default=5.0, gt=0, le=100.0)
 
 class CourseUpdate(BaseModel):
     name: Optional[str] = Field(default=None, min_length=1, max_length=100)
@@ -43,13 +65,13 @@ class CourseResponse(BaseModel):
     weekly_goal_hours: float
     created_at: str
 
-# ----------------- STUDY SESSION SCHEMAS -----------------
+# ----------------- QUICK STUDY SESSION SCHEMAS -----------------
 
 class StudySessionCreate(BaseModel):
     course_id: int
-    duration_minutes: int = Field(gt=0, le=720, example=50, description="مدت زمان به دقیقه (حداکثر ۱۲ ساعت)")
-    session_date: Optional[date] = Field(default_factory=date.today, example="2026-10-15")
-    notes: Optional[str] = Field(default=None, max_length=500, example="حل تست‌های درخت دودویی")
+    duration_minutes: int = Field(gt=0, le=600)
+    session_date: Optional[date] = Field(default_factory=date.today)
+    notes: Optional[str] = Field(default=None, max_length=500)
 
 class StudySessionResponse(BaseModel):
     id: int
@@ -66,29 +88,37 @@ class StudySessionResponse(BaseModel):
 class SessionCreationResult(BaseModel):
     session: StudySessionResponse
     total_user_coins: int
+    today_quick_minutes: int
+    remaining_quick_minutes: int
     message: str
-
-from typing import Literal
 
 # ----------------- SHOP & LEADERBOARD SCHEMAS -----------------
 
 class ThemeItem(BaseModel):
     id: str
     name: str
+    name_fa: str
+    inspiration: str
+    rarity: str
     price: int
     preview_color: str
-    description: str
+    secondary_color: str
+    description_fa: str
+    description_en: str
     is_owned: bool
     is_active: bool
 
 class ThemeActionRequest(BaseModel):
-    theme_id: str = Field(min_length=2, max_length=30)
+    theme_id: str = Field(min_length=2, max_length=40)
 
 class LeaderboardUser(BaseModel):
     rank: int
     user_id: int
     username: str
     active_theme: str
+    level: int = 1
+    title: str = "Sleepy Novice"
+    title_fa: str = "نوآموز خواب‌آلود"
     total_study_minutes: int
     total_study_hours: float
     total_coins_earned: int
@@ -96,16 +126,19 @@ class LeaderboardUser(BaseModel):
 # ----------------- STUDY GROUP SCHEMAS -----------------
 
 class GroupCreate(BaseModel):
-    name: str = Field(min_length=2, max_length=50, example="تیم هوش مصنوعی")
-    description: Optional[str] = Field(default=None, max_length=200, example="مطالعه گروهی برای پروژه درس هوش")
+    name: str = Field(min_length=2, max_length=50)
+    description: Optional[str] = Field(default=None, max_length=200)
 
 class GroupJoin(BaseModel):
-    invite_code: str = Field(min_length=6, max_length=12, example="SM-7X8K2")
+    invite_code: str = Field(min_length=6, max_length=12)
 
 class GroupMemberItem(BaseModel):
     user_id: int
     username: str
     active_theme: str
+    level: int = 1
+    title: str = "Sleepy Novice"
+    title_fa: str = "نوآموز خواب‌آلود"
     is_owner: bool
     total_study_minutes: int
     total_study_hours: float
@@ -131,11 +164,12 @@ class GroupDetail(BaseModel):
 # ----------------- AI STUDY COACH SCHEMAS -----------------
 
 class AICoachRequest(BaseModel):
-    goal_title: str = Field(min_length=2, max_length=100, example="امتحان پایان‌ترم هوش مصنوعی")
-    target_date: date = Field(example="2026-11-20", description="تاریخ هدف یا موعد امتحان")
-    daily_hours: float = Field(gt=0.5, le=14.0, example=3.5, description="ساعت مطالعه مفید در هر روز")
-    topics: List[str] = Field(min_length=1, max_length=15, example=["جستجوی آگاهانه و A*", "الگوریتم‌های ژنتیک", "شبکه‌های عصبی"])
-    notes: Optional[str] = Field(default=None, max_length=300, example="روی فصل شبکه‌های عصبی ضعف دارم")
+    goal_title: str = Field(min_length=2, max_length=100)
+    target_date: date
+    daily_hours: float = Field(gt=0.5, le=14.0)
+    topics: List[str] = Field(min_length=1, max_length=15)
+    notes: Optional[str] = Field(default=None, max_length=300)
+    lang: Literal["fa", "en"] = "fa"
 
 class PlanDaySchedule(BaseModel):
     day_number: int
@@ -165,18 +199,11 @@ class SavedPlanSummary(BaseModel):
     daily_hours: float
     created_at: str
 
-from datetime import datetime
-from typing import Optional
-from pydantic import BaseModel, Field
-
 # ----------------- POMODORO TIMER SCHEMAS -----------------
 
 class PomodoroStartRequest(BaseModel):
-    topic: Optional[str] = Field(None, max_length=100, description="موضوع اختیاری پومودورو", example="حل مسائل جستجوی آگاهانه")
-    target_minutes: int = Field(25, ge=1, le=180, description="مدت زمان هدف به دقیقه (پیش‌فرض ۲۵)", example=25)
-
-class PomodoroFinishRequest(BaseModel):
-    actual_minutes: Optional[int] = Field(None, ge=1, le=300, description="مدت واقعی مطالعه در صورت تغییر توسط کلاینت")
+    topic: Optional[str] = Field(None, max_length=100)
+    target_minutes: int = Field(25, ge=25, le=180)
 
 class PomodoroSessionResponse(BaseModel):
     id: int
@@ -184,12 +211,14 @@ class PomodoroSessionResponse(BaseModel):
     target_minutes: int
     actual_minutes: int
     coins_earned: int
+    streak_bonus_coins: Optional[int] = 0
+    current_streak: Optional[int] = 0
     status: str
     started_at: str
     ended_at: Optional[str]
     user_total_coins: Optional[int] = None
 
-# ----------------- PLAN TASK TRACKING & DASHBOARD SCHEMAS -----------------
+# ----------------- PLAN TRACKING & DASHBOARD SCHEMAS -----------------
 
 class PlanDayToggleResponse(BaseModel):
     plan_id: int
@@ -214,13 +243,60 @@ class PlanDetailResponse(BaseModel):
     progress_percentage: float
 
 class DashboardStatsResponse(BaseModel):
+    user_id: int
     username: str
     coins: int
     current_streak: int
-    streak_status: str  # e.g. "active_today", "pending_today", "at_risk"
+    streak_status: str
+    next_streak_reward: int
     active_theme: str
     leaderboard_rank: int
     today_pomodoro_count: int
+    today_pomodoro_minutes: int
+    today_quick_minutes: int
+    remaining_quick_minutes: int
     today_study_minutes: int
+    today_study_hours: float
     total_study_hours: float
     active_plans_count: int
+    level: int = 1
+    xp: int = 0
+    next_level_xp: int = 150
+    title: str = "Sleepy Novice"
+    title_fa: str = "نوآموز خواب‌آلود"
+
+# ----------------- BOSS RAIDS & QUIZ & HEATMAP SCHEMAS -----------------
+
+class BossNameSuggestRequest(BaseModel):
+    course_or_goal: str = Field(min_length=2, max_length=80)
+    lang: Literal["fa", "en"] = "fa"
+
+class RaidCreateRequest(BaseModel):
+    course_or_goal: str = Field(min_length=2, max_length=80)
+    boss_name: Optional[str] = Field(default=None, max_length=80)
+    max_hp: int = Field(ge=25, le=50000, description="هر ۲۵ اچ‌پی معادل ۱۰ سکه پاداش ثابت")
+    lang: Literal["fa", "en"] = "fa"
+
+class RaidResponse(BaseModel):
+    id: int
+    group_id: int
+    boss_name: str
+    max_hp: int
+    current_hp: int
+    reward_coins: int
+    status: str
+    created_at: str
+    top_damage_dealers: List[dict] = []
+
+class QuizQuestion(BaseModel):
+    question: str
+    options: List[str]
+    correct_index: int
+
+class QuizSubmitRequest(BaseModel):
+    answers: List[int]
+
+class HeatmapDay(BaseModel):
+    date: str
+    minutes: int
+    count: int

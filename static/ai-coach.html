@@ -1,0 +1,261 @@
+﻿<!DOCTYPE html>
+<html lang="fa" dir="rtl" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StudyMate | AI Study Coach</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { darkMode: 'class' };
+    </script>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body class="pb-16">
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 pt-8 space-y-8">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <!-- Left Column: Form & Saved Plans List -->
+            <div class="lg:col-span-4 space-y-6">
+                <div class="glass-card p-6 space-y-4">
+                    <h1 data-i18n="ai_title" class="text-2xl font-black">مربی برنامه‌ریزی هوشمند Gemini</h1>
+                    <p data-i18n="ai_subtitle" class="text-xs text-slate-400 leading-relaxed">
+                        هدف و مباحثت رو بگو تا هوش مصنوعی برنامه دقیق روزانه با پاداش سکه برات بچینه.
+                    </p>
+
+                    <form id="ai-form" onsubmit="handleGeneratePlan(event)" class="space-y-3.5 pt-2">
+                        <div>
+                            <label data-i18n="ai_goal_label" class="block text-xs font-bold mb-1 text-slate-400">عنوان هدف یا امتحان</label>
+                            <input type="text" id="ai-goal" required data-i18n-ph="ai_goal_ph" placeholder="مثلاً: امتحان پایان‌ترم هوش مصنوعی" class="w-full px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800/90 border border-slate-300 dark:border-slate-700 text-sm focus:outline-none focus:border-accent">
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label data-i18n="ai_date_label" class="block text-xs font-bold mb-1 text-slate-400">تاریخ هدف</label>
+                                <input type="date" id="ai-date" required class="w-full px-3 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800/90 border border-slate-300 dark:border-slate-700 text-sm focus:outline-none focus:border-accent">
+                            </div>
+                            <div>
+                                <label data-i18n="ai_hours_label" class="block text-xs font-bold mb-1 text-slate-400">ساعت روزانه</label>
+                                <input type="number" id="ai-hours" step="0.5" min="1" max="14" value="3.5" required class="w-full px-3 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800/90 border border-slate-300 dark:border-slate-700 text-sm focus:outline-none focus:border-accent">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label data-i18n="ai_topics_label" class="block text-xs font-bold mb-1 text-slate-400">مباحث (با ویرگول جدا کن)</label>
+                            <input type="text" id="ai-topics" required data-i18n-ph="ai_topics_ph" placeholder="جستجوی آگاهانه، الگوریتم ژنتیک، شبکه‌های عصبی" class="w-full px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800/90 border border-slate-300 dark:border-slate-700 text-sm focus:outline-none focus:border-accent">
+                        </div>
+
+                        <div>
+                            <label data-i18n="ai_notes_label" class="block text-xs font-bold mb-1 text-slate-400">نقاط ضعف یا توضیحات تکمیلی</label>
+                            <textarea id="ai-notes" rows="2" data-i18n-ph="ai_notes_ph" placeholder="مثلاً: روی شبکه‌های عصبی ضعف دارم..." class="w-full px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800/90 border border-slate-300 dark:border-slate-700 text-sm focus:outline-none focus:border-accent"></textarea>
+                        </div>
+
+                        <button type="submit" id="ai-submit-btn" data-i18n="ai_generate_btn" class="w-full btn-accent py-3.5 rounded-xl text-sm font-extrabold">
+                            تولید برنامه هوشمند با Gemini ✨
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Saved Plans List -->
+                <div class="glass-card p-6 space-y-3">
+                    <h2 data-i18n="ai_saved_plans" class="text-lg font-extrabold">برنامه‌های ذخیره‌شده من</h2>
+                    <div id="saved-plans-list" class="space-y-2.5 max-h-80 overflow-y-auto"></div>
+                </div>
+            </div>
+
+            <!-- Right Column: Interactive Plan Details & Checklist -->
+            <div class="lg:col-span-8">
+                <div id="plan-detail-container" class="glass-card p-6 sm:p-8 min-h-[450px] flex flex-col justify-center items-center text-center">
+                    <div class="max-w-md space-y-3 opacity-70">
+                        <span class="text-5xl">🤖</span>
+                        <h3 class="text-xl font-bold">هنوز برنامه‌ای انتخاب نشده است</h3>
+                        <p class="text-sm text-slate-400">از فرم کنار یک برنامه جدید با هوش مصنوعی بسازید یا یکی از برنامه‌های قبلی خود را انتخاب کنید.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="/static/js/i18n.js"></script>
+    <script src="/static/js/theme.js"></script>
+    <script src="/static/js/api.js"></script>
+    <script>
+        injectSharedLayout("ai-coach");
+
+        // تنظیم تاریخ پیش‌فرض به ۷ روز بعد
+        const defaultDate = new Date();
+        defaultDate.setDate(defaultDate.getDate() + 6);
+        document.getElementById("ai-date").value = defaultDate.toISOString().split("T")[0];
+
+        let currentActivePlanId = null;
+
+        async function loadSavedPlans() {
+            if (!getToken()) return;
+            try {
+                const plans = await apiRequest("/ai/plans");
+                const list = document.getElementById("saved-plans-list");
+                if (plans.length === 0) {
+                    list.innerHTML = `<p class="text-xs text-slate-400">هنوز برنامه‌ای نساخته‌اید.</p>`;
+                    return;
+                }
+                list.innerHTML = plans.map(p => `
+                    <div onclick="openPlanDetails(${p.id})" class="p-3.5 rounded-xl border cursor-pointer transition flex items-center justify-between ${currentActivePlanId === p.id ? 'border-accent bg-indigo-500/10' : 'border-slate-200 dark:border-slate-800 hover:border-accent'}">
+                        <div>
+                            <h4 class="font-bold text-sm">${p.goal_title}</h4>
+                            <p class="text-xs text-slate-400">🎯 ${p.target_date} • ⏱️ ${p.daily_hours}h/day</p>
+                        </div>
+                        <button onclick="event.stopPropagation(); deletePlan(${p.id})" class="text-slate-400 hover:text-red-400 px-2">🗑️</button>
+                    </div>
+                `).join("");
+
+                if (!currentActivePlanId && plans.length > 0) {
+                    openPlanDetails(plans[0].id);
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        async function handleGeneratePlan(e) {
+            e.preventDefault();
+            const btn = document.getElementById("ai-submit-btn");
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = "⏳ هوش مصنوعی Gemini در حال طراحی برنامه...";
+
+            const goal_title = document.getElementById("ai-goal").value.trim();
+            const target_date = document.getElementById("ai-date").value;
+            const daily_hours = parseFloat(document.getElementById("ai-hours").value);
+            const rawTopics = document.getElementById("ai-topics").value;
+            const topics = rawTopics.split(/[,،]/).map(t => t.trim()).filter(Boolean);
+            const notes = document.getElementById("ai-notes").value.trim() || null;
+
+            try {
+                const created = await apiRequest("/ai/generate-plan", {
+                    method: "POST",
+                    body: JSON.stringify({ goal_title, target_date, daily_hours, topics, notes })
+                });
+                showToast("برنامه هوشمند با موفقیت ساخته شد! ✨");
+                currentActivePlanId = created.id;
+                await loadSavedPlans();
+                await openPlanDetails(created.id);
+            } catch (err) {
+                showToast(err.message, "error");
+            } finally {
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
+        }
+
+        async function openPlanDetails(planId) {
+            currentActivePlanId = planId;
+            try {
+                const plan = await apiRequest(`/ai/plans/${planId}`);
+                renderPlanSchedule(plan);
+                loadSavedPlans();
+            } catch (err) {
+                showToast(err.message, "error");
+            }
+        }
+
+        function renderPlanSchedule(plan) {
+            const container = document.getElementById("plan-detail-container");
+            container.className = "glass-card p-6 sm:p-8 space-y-6 text-right";
+
+            const completedSet = new Set(plan.completed_days || []);
+            const progress = plan.progress_percentage || 0;
+
+            container.innerHTML = `
+                <!-- Header Info -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-5">
+                    <div>
+                        <span class="text-xs font-bold px-3 py-1 rounded-full bg-indigo-500/10 text-accent">🎯 موعد: ${plan.target_date} (${plan.days_remaining} روز)</span>
+                        <h2 class="text-2xl sm:text-3xl font-black mt-2">${plan.goal_title}</h2>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="px-4 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-bold">
+                            پتانسیل سکه: ${plan.total_potential_coins} 🪙
+                        </div>
+                        <div class="px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold">
+                            کل ساعت: ${plan.total_planned_hours}h
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quote & Strategy -->
+                <div class="p-4 rounded-xl bg-slate-100/80 dark:bg-slate-800/60 border-r-4 border-accent space-y-1.5">
+                    <p class="text-sm font-bold text-accent">💡 استراتژی مربی هوشمند:</p>
+                    <p class="text-xs sm:text-sm leading-relaxed">${plan.strategy_advice}</p>
+                    <p class="text-xs italic text-slate-400 pt-1">"${plan.motivational_quote}"</p>
+                </div>
+
+                <!-- Animated Progress Bar -->
+                <div class="space-y-2">
+                    <div class="flex justify-between text-xs font-bold">
+                        <span data-i18n="ai_progress_label">درصد پیشرفت کل برنامه</span>
+                        <span id="plan-progress-text" class="text-accent">${progress}%</span>
+                    </div>
+                    <div class="w-full h-3.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                        <div id="plan-progress-bar" class="h-full btn-accent transition-all duration-500 rounded-full" style="width: ${progress}%"></div>
+                    </div>
+                </div>
+
+                <!-- Horizontal Schedule Cards -->
+                <div class="space-y-3 pt-2">
+                    ${plan.schedule.map(day => {
+                        const isDone = completedSet.has(day.day_number);
+                        return `
+                            <div id="day-card-${day.day_number}" onclick="toggleDayCheck(${plan.id},${day.day_number})"
+                                class="p-4 rounded-2xl border transition cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${isDone ? 'bg-emerald-500/10 border-emerald-500/40 opacity-80' : 'bg-slate-100/50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700/70 hover:border-accent'}">
+                                <div class="flex items-start sm:items-center gap-4">
+                                    <button class="w-8 h-8 rounded-xl flex items-center justify-center font-bold text-sm transition ${isDone ? 'bg-emerald-500 text-white' : 'border-2 border-slate-400 text-transparent'}">
+                                        ✓
+                                    </button>
+                                    <div>
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-xs font-extrabold px-2 py-0.5 rounded bg-slate-200 dark:bg-slate-700">روز ${day.day_number}</span>
+                                            <span class="text-xs text-slate-400">${day.date}</span>
+                                            <span class="text-xs font-bold text-accent">• ${day.focus_topic}</span>
+                                        </div>
+                                        <p class="text-sm font-medium mt-1.5 ${isDone ? 'line-through text-slate-400' : ''}">${day.action_item}</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-2 self-end sm:self-center shrink-0">
+                                    <span class="text-xs px-2.5 py-1 rounded-lg bg-slate-200/70 dark:bg-slate-800 font-semibold">🍅 ${day.pomodoro_blocks} پومودورو</span>
+                                    <span class="text-xs px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-400 font-bold">+${day.potential_coins} 🪙</span>
+                                </div>
+                            </div>
+                        `;
+                    }).join("")}
+                </div>
+            `;
+        }
+
+        async function toggleDayCheck(planId, dayNumber) {
+            try {
+                const res = await apiRequest(`/ai/plans/${planId}/days/${dayNumber}/toggle`, {
+                    method: "POST"
+                });
+                if (res.is_completed) playVictorySound();
+                showToast(res.message);
+                await openPlanDetails(planId);
+            } catch (err) {
+                showToast(err.message, "error");
+            }
+        }
+
+        async function deletePlan(planId) {
+            try {
+                await apiRequest(`/ai/plans/${planId}`, { method: "DELETE" });
+                showToast("برنامه حذف شد.");
+                if (currentActivePlanId === planId) currentActivePlanId = null;
+                await loadSavedPlans();
+            } catch (err) {
+                showToast(err.message, "error");
+            }
+        }
+
+        window.addEventListener("authSuccess", loadSavedPlans);
+        window.addEventListener("DOMContentLoaded", loadSavedPlans);
+    </script>
+</body>
+</html>

@@ -1,0 +1,118 @@
+﻿<!DOCTYPE html>
+<html lang="fa" dir="rtl" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StudyMate | Theme Shop</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { darkMode: 'class' };
+    </script>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body class="pb-16">
+
+    <main class="max-w-6xl mx-auto px-4 sm:px-6 pt-8 space-y-8">
+        <div class="glass-card p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+                <h1 data-i18n="shop_title" class="text-3xl font-black">فروشگاه تم و شخصی‌سازی پروفایل</h1>
+                <p data-i18n="shop_subtitle" class="text-sm text-slate-400 mt-2">
+                    با سکه‌هایی که از مطالعه جمع کردی، تم اختصاصی بخر تا پروفایل و کل سایتت به رنگ دلخواهت بدرخشه!
+                </p>
+            </div>
+            <div class="px-5 py-3 rounded-2xl bg-amber-500/10 border border-amber-500/40 text-amber-400 font-black text-lg shrink-0 flex items-center gap-2">
+                <span>🪙</span>
+                <span id="shop-user-coins">0</span>
+            </div>
+        </div>
+
+        <!-- Themes Grid -->
+        <div id="themes-grid" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div>
+    </main>
+
+    <script src="/static/js/i18n.js"></script>
+    <script src="/static/js/theme.js"></script>
+    <script src="/static/js/api.js"></script>
+    <script>
+        injectSharedLayout("shop");
+
+        async function loadShopThemes() {
+            if (!getToken()) return;
+            try {
+                const stats = await syncHeaderUserStats();
+                if (stats) document.getElementById("shop-user-coins").textContent = `${stats.coins} Coins`;
+
+                const themes = await apiRequest("/shop/themes");
+                const grid = document.getElementById("themes-grid");
+
+                grid.innerHTML = themes.map(item => {
+                    let actionBtn = "";
+                    if (item.is_active) {
+                        actionBtn = `<button disabled class="w-full py-3 rounded-xl font-bold text-sm bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 cursor-default">${t("shop_active")}</button>`;
+                    } else if (item.is_owned) {
+                        actionBtn = `<button onclick="equipTheme('${item.id}')" class="w-full py-3 rounded-xl font-bold text-sm btn-accent">${t("shop_equip_btn")}</button>`;
+                    } else {
+                        actionBtn = `<button onclick="buyTheme('${item.id}')" class="w-full py-3 rounded-xl font-bold text-sm bg-amber-500 hover:bg-amber-400 text-slate-950 transition">${t("shop_buy_btn")} (${item.price} 🪙)</button>`;
+                    }
+
+                    return `
+                        <div class="glass-card overflow-hidden flex flex-col justify-between border-2 ${item.is_active ? 'border-accent' : 'border-transparent'}">
+                            <div>
+                                <!-- Theme Preview Banner -->
+                                <div class="h-28 p-5 flex items-end justify-between text-white ${getProfileThemeClass(item.id)}">
+                                    <div>
+                                        <span class="text-xs uppercase tracking-widest opacity-80">Theme Preview</span>
+                                        <h3 class="text-2xl font-black">${item.name}</h3>
+                                    </div>
+                                    <span class="px-3 py-1 rounded-full bg-black/30 backdrop-blur-md text-xs font-bold">
+                                        ${item.price === 0 ? 'FREE' : item.price + ' 🪙'}
+                                    </span>
+                                </div>
+                                <div class="p-6">
+                                    <p class="text-sm text-slate-400">${item.description}</p>
+                                </div>
+                            </div>
+                            <div class="px-6 pb-6">
+                                ${actionBtn}
+                            </div>
+                        </div>
+                    `;
+                }).join("");
+            } catch (err) {
+                showToast(err.message, "error");
+            }
+        }
+
+        async function buyTheme(themeId) {
+            try {
+                const res = await apiRequest("/shop/buy", {
+                    method: "POST",
+                    body: JSON.stringify({ theme_id: themeId })
+                });
+                triggerCoinCelebration();
+                showToast(res.message);
+                await equipTheme(themeId);
+            } catch (err) {
+                showToast(err.message, "error");
+            }
+        }
+
+        async function equipTheme(themeId) {
+            try {
+                const res = await apiRequest("/shop/equip", {
+                    method: "POST",
+                    body: JSON.stringify({ theme_id: themeId })
+                });
+                applyUserEquippedTheme(themeId);
+                showToast(`تم «${themeId}» روی پروفایل و کل سایت شما فعال شد! 🎨`);
+                await loadShopThemes();
+            } catch (err) {
+                showToast(err.message, "error");
+            }
+        }
+
+        window.addEventListener("authSuccess", loadShopThemes);
+        window.addEventListener("DOMContentLoaded", loadShopThemes);
+    </script>
+</body>
+</html>
