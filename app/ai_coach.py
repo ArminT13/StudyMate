@@ -1,18 +1,18 @@
 import os
 import json
 import re
+from pathlib import Path
 from datetime import date, timedelta
 from typing import List, Dict, Any
 import httpx
 from fastapi import HTTPException, status
-from pathlib import Path
 from dotenv import load_dotenv
 
-# بارگذاری خودکار فایل .env از ریشه پروژه
+# پیدا کردن مسیر ریشه پروژه و لود کردن صریح فایل .env
 BASE_DIR = Path(__file__).resolve().parent.parent
-load_dotenv(dotenv_path=BASE_DIR / ".env")
+env_path = BASE_DIR / ".env"
+load_dotenv(dotenv_path=env_path)
 
-# خواندن کلید و مدل فقط از محیط (بدون مقدار هاردکد شده)
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
 

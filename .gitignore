@@ -16,3 +16,4 @@ __pycache__/
 studymate.db
 studymate.db-journal
 studymate.db-wal
+studymate.db-shm
