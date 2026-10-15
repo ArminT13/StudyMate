@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date,timedelta
 import secrets
 import string
 import json
@@ -10,7 +10,8 @@ from app.schemas import (
     ThemeItem, ThemeActionRequest, LeaderboardUser,
     GroupCreate, GroupJoin, GroupSummary, GroupDetail, GroupMemberItem,
     AICoachRequest, AICoachPlan, SavedPlanSummary,
-    PomodoroStartRequest, PomodoroFinishRequest, PomodoroSessionResponse  # <-- اضافه شد
+    PomodoroStartRequest, PomodoroFinishRequest, PomodoroSessionResponse,
+    PlanDayToggleResponse, PlanDetailResponse, DashboardStatsResponse  # <-- جدید
 )
 from fastapi import FastAPI, HTTPException, Depends, Query, status
 from typing import List, Literal, Optional
@@ -200,6 +201,37 @@ def calculate_coins(duration_minutes: int) -> int:
     """هر ۲۵ دقیقه = ۱۰ سکه مطالعه"""
     return (duration_minutes // 25) * 10
 
+def update_user_streak(cursor, user_id: int) -> int:
+    """محاسبه هوشمند استریک روزانه بر اساس تقویم مطالعه"""
+    today = date.today()
+    cursor.execute("SELECT current_streak, last_study_date FROM users WHERE id = ?", (user_id,))
+    user = cursor.fetchone()
+    if not user:
+        return 0
+
+    current_streak = user["current_streak"] or 0
+    last_study_str = user["last_study_date"]
+
+    if last_study_str:
+        last_date = date.fromisoformat(last_study_str)
+        if last_date == today:
+            # کاربر قبلاً امروز مطالعه ثبت کرده، استریک تغییر نمی‌کند
+            return current_streak
+        elif last_date == today - timedelta(days=1):
+            # کاربر دیروز مطالعه داشته؛ استریک یکی افزایش می‌یابد
+            current_streak += 1
+        else:
+            # بیش از یک روز فاصله افتاده؛ استریک ریست و از ۱ شروع می‌شود
+            current_streak = 1
+    else:
+        # اولین روز مطالعه کاربر
+        current_streak = 1
+
+    cursor.execute(
+        "UPDATE users SET current_streak = ?, last_study_date = ? WHERE id = ?",
+        (current_streak, str(today), user_id)
+    )
+    return current_streak
 
 # ۱. ثبت جلسه جدید و اهدای سکه
 @app.post("/sessions", response_model=SessionCreationResult, status_code=status.HTTP_201_CREATED)
@@ -253,7 +285,7 @@ def log_study_session(
         # دریافت موجودی جدید سکه کاربر
         cursor.execute("SELECT coins FROM users WHERE id = ?", (current_user["id"],))
         updated_coins = cursor.fetchone()["coins"]
-
+        update_user_streak(cursor, current_user["id"])
         conn.commit()
 
     session_dict = {
@@ -941,6 +973,8 @@ def complete_pomodoro_session(
         # دریافت موجودی جدید سکه‌ها
         cursor.execute("SELECT coins FROM users WHERE id = ?", (current_user["id"],))
         updated_coins = cursor.fetchone()["coins"]
+        # به‌روزرسانی خودکار استریک کاربر
+        update_user_streak(cursor, current_user["id"])
         conn.commit()
 
         cursor.execute("SELECT * FROM pomodoro_sessions WHERE id = ?", (session_id,))
@@ -948,3 +982,176 @@ def complete_pomodoro_session(
         final_session["user_total_coins"] = updated_coins
 
     return final_session
+
+# ----------------- AI PLAN PROGRESS TRACKING -----------------
+
+@app.post("/ai/plans/{plan_id}/days/{day_number}/toggle", response_model=PlanDayToggleResponse)
+def toggle_plan_day_completion(
+    plan_id: int,
+    day_number: int,
+    current_user: dict = Depends(get_current_user)
+):
+    """تیک زدن یا برداشتن تیک تسک روزانه از برنامه درسی هوش مصنوعی"""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+
+        # بررسی وجود پلن و مالکیت آن
+        cursor.execute("SELECT plan_json FROM ai_plans WHERE id = ? AND user_id = ?", (plan_id, current_user["id"]))
+        plan_row = cursor.fetchone()
+        if not plan_row:
+            raise HTTPException(status_code=404, detail="برنامه درسی یافت نشد.")
+
+        plan_data = json.loads(plan_row["plan_json"])
+        total_days = len(plan_data.get("schedule", []))
+        if day_number < 1 or day_number > total_days:
+            raise HTTPException(status_code=400, detail=f"شماره روز نامعتبر است (بین ۱ تا {total_days}).")
+
+        # بررسی وضعیت فعلی تیک
+        cursor.execute(
+            "SELECT id FROM plan_day_completions WHERE plan_id = ? AND day_number = ?",
+            (plan_id, day_number)
+        )
+        existing = cursor.fetchone()
+
+        if existing:
+            # تیک قبلاً خورده، حذف تیک (Uncheck)
+            cursor.execute(
+                "DELETE FROM plan_day_completions WHERE plan_id = ? AND day_number = ?",
+                (plan_id, day_number)
+            )
+            is_completed = False
+            msg = f"تسک روز {day_number} به حالت انجام‌نشده تغییر یافت."
+        else:
+            # ثبت تیک تسک (Check)
+            cursor.execute(
+                "INSERT INTO plan_day_completions (plan_id, user_id, day_number) VALUES (?, ?, ?)",
+                (plan_id, current_user["id"], day_number)
+            )
+            is_completed = True
+            msg = f"آفرین! تسک روز {day_number} با موفقیت تیک خورد."
+
+        # دریافت لیست تمام روزهای تکمیل‌شده
+        cursor.execute("SELECT day_number FROM plan_day_completions WHERE plan_id = ?", (plan_id,))
+        completed_days = [row["day_number"] for row in cursor.fetchall()]
+
+        progress_percentage = round((len(completed_days) / total_days) * 100, 1) if total_days > 0 else 0.0
+        conn.commit()
+
+    return {
+        "plan_id": plan_id,
+        "day_number": day_number,
+        "is_completed": is_completed,
+        "completed_days": completed_days,
+        "progress_percentage": progress_percentage,
+        "message": msg
+    }
+
+
+# بازنویسی اندپوینت دریافت جزئیات پلن برای نمایش درصد پیشرفت و تیک‌ها
+@app.get("/ai/plans/{plan_id}", response_model=PlanDetailResponse)
+def get_plan_by_id(
+    plan_id: int,
+    current_user: dict = Depends(get_current_user)
+):
+    """دریافت جزئیات برنامه هوش مصنوعی به همراه درصد پیشرفت و روزهای تیک‌خورده"""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id, plan_json FROM ai_plans WHERE id = ? AND user_id = ?",
+            (plan_id, current_user["id"])
+        )
+        row = cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="برنامه درسی یافت نشد.")
+
+        # دریافت روزهای انجام‌شده
+        cursor.execute("SELECT day_number FROM plan_day_completions WHERE plan_id = ?", (plan_id,))
+        completed_days = [r["day_number"] for r in cursor.fetchall()]
+
+    plan_dict = json.loads(row["plan_json"])
+    plan_dict["id"] = row["id"]
+    plan_dict["completed_days"] = completed_days
+    
+    total_days = len(plan_dict.get("schedule", []))
+    plan_dict["progress_percentage"] = round((len(completed_days) / total_days) * 100, 1) if total_days > 0 else 0.0
+
+    return plan_dict
+
+
+# ----------------- DASHBOARD & STATS -----------------
+
+@app.get("/dashboard/stats", response_model=DashboardStatsResponse)
+def get_dashboard_stats(current_user: dict = Depends(get_current_user)):
+    """دریافت آمار جامع کاربر شامل استریک، رتبه لیدربورد، پومودوروهای امروز و ساعات مطالعه"""
+    today = date.today()
+    user_id = current_user["id"]
+
+    with get_connection() as conn:
+        cursor = conn.cursor()
+
+        # ۱. وضعیت استریک واقعی
+        cursor.execute("SELECT current_streak, last_study_date, coins, active_theme FROM users WHERE id = ?", (user_id,))
+        u = cursor.fetchone()
+        raw_streak = u["current_streak"] or 0
+        last_date = date.fromisoformat(u["last_study_date"]) if u["last_study_date"] else None
+
+        if last_date == today:
+            streak_status = "active_today"  # امروز مطالعه داشته و زنجیره حفظ شده
+            effective_streak = raw_streak
+        elif last_date == today - timedelta(days=1):
+            streak_status = "pending_today"  # اگر امروز مطالعه نکند زنجیره می‌سوزد!
+            effective_streak = raw_streak
+        else:
+            streak_status = "at_risk"  # زنجیره شکسته شده
+            effective_streak = 0 if last_date else 0
+
+        # ۲. پومودوروها و ساعات مطالعه امروز
+        cursor.execute("""
+            SELECT 
+                COUNT(*) AS today_pomo_count,
+                COALESCE(SUM(actual_minutes), 0) AS today_pomo_mins
+            FROM pomodoro_sessions 
+            WHERE user_id = ? AND status = 'completed' AND date(ended_at) = CURRENT_DATE
+        """, (user_id,))
+        pomo_stats = cursor.fetchone()
+
+        # ۳. کل ساعات مطالعه کاربر (جلسات عادی + پومودورو)
+        cursor.execute("""
+            SELECT 
+                (SELECT COALESCE(SUM(duration_minutes), 0) FROM study_sessions WHERE user_id = ?) +
+                (SELECT COALESCE(SUM(actual_minutes), 0) FROM pomodoro_sessions WHERE user_id = ? AND status = 'completed')
+                AS total_all_minutes
+        """, (user_id, user_id))
+        total_mins = cursor.fetchone()["total_all_minutes"]
+
+        # ۴. محاسبه رتبه کاربر در کل سیستم
+        cursor.execute("""
+            SELECT COUNT(*) + 1 AS rank
+            FROM (
+                SELECT u.id, 
+                       COALESCE(SUM(s.duration_minutes), 0) + 
+                       (SELECT COALESCE(SUM(p.actual_minutes), 0) FROM pomodoro_sessions p WHERE p.user_id = u.id AND p.status = 'completed') AS total_mins
+                FROM users u
+                LEFT JOIN study_sessions s ON u.id = s.user_id
+                GROUP BY u.id
+            ) ranked_users
+            WHERE total_mins > ?
+        """, (total_mins,))
+        leaderboard_rank = cursor.fetchone()["rank"]
+
+        # ۵. تعداد برنامه‌های فعال هوش مصنوعی
+        cursor.execute("SELECT COUNT(*) AS plan_count FROM ai_plans WHERE user_id = ?", (user_id,))
+        plans_count = cursor.fetchone()["plan_count"]
+
+    return {
+        "username": current_user["username"],
+        "coins": u["coins"],
+        "current_streak": effective_streak,
+        "streak_status": streak_status,
+        "active_theme": u["active_theme"],
+        "leaderboard_rank": leaderboard_rank,
+        "today_pomodoro_count": pomo_stats["today_pomo_count"],
+        "today_study_minutes": pomo_stats["today_pomo_mins"],
+        "total_study_hours": round(total_mins / 60, 1),
+        "active_plans_count": plans_count
+    }

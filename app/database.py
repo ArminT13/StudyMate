@@ -12,7 +12,7 @@ def get_connection():
     return conn
 
 def init_db():
-    """Initialize relational schema for users, courses, and study sessions."""
+    """Initialize relational schema for users, courses, study sessions, and gamification."""
     with get_connection() as conn:
         cursor = conn.cursor()
 
@@ -25,9 +25,22 @@ def init_db():
                 password_hash TEXT NOT NULL,
                 coins INTEGER DEFAULT 0,
                 active_theme TEXT DEFAULT 'default',
+                current_streak INTEGER DEFAULT 0,
+                last_study_date DATE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """)
+
+        # اضافه کردن ستون‌های استریک به دیتابیس موجود بدون کرش کردن
+        try:
+            cursor.execute("ALTER TABLE users ADD COLUMN current_streak INTEGER DEFAULT 0;")
+        except sqlite3.OperationalError:
+            pass
+
+        try:
+            cursor.execute("ALTER TABLE users ADD COLUMN last_study_date DATE;")
+        except sqlite3.OperationalError:
+            pass
 
         # 2. Courses Table
         cursor.execute("""
@@ -42,7 +55,7 @@ def init_db():
             );
         """)
 
-        # 3. Study Sessions Table (ثبت دستی جلسات درس‌های انتخابی)
+        # 3. Study Sessions Table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS study_sessions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -115,7 +128,7 @@ def init_db():
             );
         """)
 
-        # 8. Pomodoro Sessions Table (تایمر زنده و تمرکز با پاداش سکه)
+        # 8. Pomodoro Sessions Table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS pomodoro_sessions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -124,9 +137,23 @@ def init_db():
                 target_minutes INTEGER DEFAULT 25,
                 actual_minutes INTEGER DEFAULT 0,
                 coins_earned INTEGER DEFAULT 0,
-                status TEXT DEFAULT 'in_progress', -- 'in_progress', 'completed', 'abandoned'
+                status TEXT DEFAULT 'in_progress',
                 started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 ended_at TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+        """)
+
+        # 9. AI Plan Day Completions Table (ثبت تیک زدن روزهای برنامه درسی)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS plan_day_completions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                plan_id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
+                day_number INTEGER NOT NULL,
+                completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(plan_id, day_number),
+                FOREIGN KEY (plan_id) REFERENCES ai_plans(id) ON DELETE CASCADE,
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             );
         """)

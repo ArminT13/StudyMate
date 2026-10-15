@@ -188,3 +188,39 @@ class PomodoroSessionResponse(BaseModel):
     started_at: str
     ended_at: Optional[str]
     user_total_coins: Optional[int] = None
+
+# ----------------- PLAN TASK TRACKING & DASHBOARD SCHEMAS -----------------
+
+class PlanDayToggleResponse(BaseModel):
+    plan_id: int
+    day_number: int
+    is_completed: bool
+    completed_days: List[int]
+    progress_percentage: float
+    message: str
+
+class PlanDetailResponse(BaseModel):
+    id: int
+    goal_title: str
+    target_date: str
+    days_remaining: int
+    daily_hours: float
+    total_planned_hours: float
+    total_potential_coins: int
+    motivational_quote: str
+    strategy_advice: str
+    schedule: List[PlanDaySchedule]
+    completed_days: List[int]
+    progress_percentage: float
+
+class DashboardStatsResponse(BaseModel):
+    username: str
+    coins: int
+    current_streak: int
+    streak_status: str  # e.g. "active_today", "pending_today", "at_risk"
+    active_theme: str
+    leaderboard_rank: int
+    today_pomodoro_count: int
+    today_study_minutes: int
+    total_study_hours: float
+    active_plans_count: int
