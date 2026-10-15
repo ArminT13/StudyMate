@@ -75,4 +75,30 @@ def init_db():
             SELECT id, 'default' FROM users;
         """)
 
+        # 5. Study Groups Table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS study_groups (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                description TEXT,
+                invite_code TEXT UNIQUE NOT NULL,
+                owner_id INTEGER NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+        """)
+
+        # 6. Group Members Table (رابطه چند به چند بین کاربران و گروه‌ها)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS group_members (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                group_id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
+                joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(group_id, user_id),
+                FOREIGN KEY (group_id) REFERENCES study_groups(id) ON DELETE CASCADE,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+        """)
+
         conn.commit()

@@ -1,10 +1,14 @@
-from fastapi import FastAPI, HTTPException, Depends, Query, status
+import secrets
+import string
+
 from app.schemas import (
     UserRegister, UserLogin, TokenResponse, UserProfile,
     CourseCreate, CourseUpdate, CourseResponse,
     StudySessionCreate, StudySessionResponse, SessionCreationResult,
-    ThemeItem, ThemeActionRequest, LeaderboardUser
+    ThemeItem, ThemeActionRequest, LeaderboardUser,
+    GroupCreate, GroupJoin, GroupSummary, GroupDetail, GroupMemberItem
 )
+from fastapi import FastAPI, HTTPException, Depends, Query, status
 from typing import List, Literal, Optional
 import sqlite3
 from app.database import init_db, get_connection
@@ -507,3 +511,218 @@ def get_leaderboard(
         )
 
     return leaderboard
+
+# ----------------- STUDY GROUPS LOGIC -----------------
+
+def generate_invite_code(length: int = 6) -> str:
+    """ایجاد کد دعوت تصادفی و خوانا مانند SM-4K9W"""
+    chars = string.ascii_uppercase + string.digits
+    # حذف کاراکترهای گمراه‌کننده شبیه به هم
+    chars = chars.replace('O', '').replace('0', '').replace('I', '').replace('1', '')
+    random_str = ''.join(secrets.choice(chars) for _ in range(length))
+    return f"SM-{random_str}"
+
+
+# ۱. ایجاد گروه مطالعه جدید
+@app.post("/groups", response_model=GroupDetail, status_code=status.HTTP_201_CREATED)
+def create_group(
+    group_data: GroupCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    invite_code = generate_invite_code()
+    
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        
+        # ثبت گروه
+        cursor.execute(
+            """
+            INSERT INTO study_groups (name, description, invite_code, owner_id)
+            VALUES (?, ?, ?, ?)
+            """,
+            (group_data.name, group_data.description, invite_code, current_user["id"])
+        )
+        group_id = cursor.lastrowid
+
+        # سازنده گروه به عنوان عضو اول به جدول اعضا اضافه می‌شود
+        cursor.execute(
+            "INSERT INTO group_members (group_id, user_id) VALUES (?, ?)",
+            (group_id, current_user["id"])
+        )
+        conn.commit()
+
+    return get_group_details(group_id=group_id, current_user=current_user)
+
+
+# ۲. عضویت در گروه با کد دعوت
+@app.post("/groups/join")
+def join_group(
+    join_data: GroupJoin,
+    current_user: dict = Depends(get_current_user)
+):
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        
+        # بررسی وجود گروه با این کد دعوت
+        cursor.execute(
+            "SELECT id, name FROM study_groups WHERE invite_code = ?",
+            (join_data.invite_code.strip().upper(),)
+        )
+        group = cursor.fetchone()
+        if not group:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invalid invite code.")
+
+        # بررسی عضویت قبلی
+        cursor.execute(
+            "SELECT id FROM group_members WHERE group_id = ? AND user_id = ?",
+            (group["id"], current_user["id"])
+        )
+        if cursor.fetchone():
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You are already a member of this group.")
+
+        # افزودن کاربر به اعضا
+        cursor.execute(
+            "INSERT INTO group_members (group_id, user_id) VALUES (?, ?)",
+            (group["id"], current_user["id"])
+        )
+        conn.commit()
+
+    return {
+        "message": f"Successfully joined group '{group['name']}'!",
+        "group_id": group["id"]
+    }
+
+
+# ۳. دریافت لیست گروه‌های من
+@app.get("/groups/my", response_model=List[GroupSummary])
+def get_my_groups(current_user: dict = Depends(get_current_user)):
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        query = """
+            SELECT 
+                g.id, g.name, g.description, g.invite_code, g.created_at,
+                g.owner_id = ? AS is_owner,
+                COUNT(gm.user_id) AS member_count
+            FROM study_groups g
+            JOIN group_members gm ON g.id = gm.group_id
+            WHERE g.id IN (SELECT group_id FROM group_members WHERE user_id = ?)
+            GROUP BY g.id
+            ORDER BY g.id DESC
+        """
+        cursor.execute(query, (current_user["id"], current_user["id"]))
+        rows = cursor.fetchall()
+
+    return [
+        GroupSummary(
+            id=row["id"],
+            name=row["name"],
+            description=row["description"],
+            invite_code=row["invite_code"],
+            member_count=row["member_count"],
+            is_owner=bool(row["is_owner"]),
+            created_at=str(row["created_at"])
+        )
+        for row in rows
+    ]
+
+
+# ۴. دریافت جزئیات و لیدربورد اختصاصی اعضای یک گروه
+@app.get("/groups/{group_id}", response_model=GroupDetail)
+def get_group_details(
+    group_id: int,
+    current_user: dict = Depends(get_current_user)
+):
+    with get_connection() as conn:
+        cursor = conn.cursor()
+
+        # بررسی دسترسی: آیا کاربر در این گروه عضو است؟
+        cursor.execute(
+            "SELECT 1 FROM group_members WHERE group_id = ? AND user_id = ?",
+            (group_id, current_user["id"])
+        )
+        if not cursor.fetchone():
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied. You are not a member of this group."
+            )
+
+        # اطلاعات پایه گروه
+        cursor.execute(
+            "SELECT id, name, description, invite_code, owner_id FROM study_groups WHERE id = ?",
+            (group_id,)
+        )
+        group = cursor.fetchone()
+        if not group:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Group not found.")
+
+        # رتبه‌بندی اعضای گروه بر اساس مجموع دقایق مطالعه
+        members_query = """
+            SELECT 
+                u.id AS user_id,
+                u.username,
+                u.active_theme,
+                (u.id = ?) AS is_owner,
+                COALESCE(SUM(s.duration_minutes), 0) AS total_study_minutes
+            FROM group_members gm
+            JOIN users u ON gm.user_id = u.id
+            LEFT JOIN study_sessions s ON u.id = s.user_id
+            WHERE gm.group_id = ?
+            GROUP BY u.id
+            ORDER BY total_study_minutes DESC, u.username ASC
+        """
+        cursor.execute(members_query, (group["owner_id"], group_id))
+        member_rows = cursor.fetchall()
+
+    members = [
+        GroupMemberItem(
+            user_id=row["user_id"],
+            username=row["username"],
+            active_theme=row["active_theme"],
+            is_owner=bool(row["is_owner"]),
+            total_study_minutes=row["total_study_minutes"],
+            total_study_hours=round(row["total_study_minutes"] / 60, 1)
+        )
+        for row in member_rows
+    ]
+
+    return GroupDetail(
+        id=group["id"],
+        name=group["name"],
+        description=group["description"],
+        invite_code=group["invite_code"],
+        owner_id=group["owner_id"],
+        member_count=len(members),
+        members=members
+    )
+
+
+# ۵. خروج از گروه
+@app.post("/groups/{group_id}/leave")
+def leave_group(
+    group_id: int,
+    current_user: dict = Depends(get_current_user)
+):
+    with get_connection() as conn:
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT owner_id FROM study_groups WHERE id = ?", (group_id,))
+        group = cursor.fetchone()
+        if not group:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Group not found.")
+
+        if group["owner_id"] == current_user["id"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Group owners cannot leave their own group. Delete the group instead."
+            )
+
+        cursor.execute(
+            "DELETE FROM group_members WHERE group_id = ? AND user_id = ?",
+            (group_id, current_user["id"])
+        )
+        conn.commit()
+
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You are not a member of this group.")
+
+    return {"message": "Successfully left the group."}

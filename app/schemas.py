@@ -21,7 +21,7 @@ class UserProfile(BaseModel):
     coins: int
     active_theme: str
 
-from typing import Optional
+from typing import List, Optional
 
 # ----------------- COURSE SCHEMAS -----------------
 
@@ -92,3 +92,38 @@ class LeaderboardUser(BaseModel):
     total_study_minutes: int
     total_study_hours: float
     total_coins_earned: int
+
+# ----------------- STUDY GROUP SCHEMAS -----------------
+
+class GroupCreate(BaseModel):
+    name: str = Field(min_length=2, max_length=50, example="تیم هوش مصنوعی")
+    description: Optional[str] = Field(default=None, max_length=200, example="مطالعه گروهی برای پروژه درس هوش")
+
+class GroupJoin(BaseModel):
+    invite_code: str = Field(min_length=6, max_length=12, example="SM-7X8K2")
+
+class GroupMemberItem(BaseModel):
+    user_id: int
+    username: str
+    active_theme: str
+    is_owner: bool
+    total_study_minutes: int
+    total_study_hours: float
+
+class GroupSummary(BaseModel):
+    id: int
+    name: str
+    description: Optional[str]
+    invite_code: str
+    member_count: int
+    is_owner: bool
+    created_at: str
+
+class GroupDetail(BaseModel):
+    id: int
+    name: str
+    description: Optional[str]
+    invite_code: str
+    owner_id: int
+    member_count: int
+    members: List[GroupMemberItem]
