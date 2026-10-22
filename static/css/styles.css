@@ -1,38 +1,41 @@
-﻿@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700;800&family=Vazirmatn:wght@400;500;600;700;800;900&display=swap');
+﻿@import url('//fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700;800&family=Vazirmatn:wght@400;500;600;700;800;900&display=swap');
 
 :root {
     --bg-base: #f4f6fb;
-    --bg-surface: #ffffff;
-    --bg-elevated: #f8fafc;
-    --text-main: #0f172a;
+    --bg-surface: rgba(255, 255, 255, 0.88);
+    --bg-elevated: rgba(241, 245, 249, 0.9);
+    --text-main: #09090b;
     --text-muted: #64748b;
-    --border-subtle: rgba(15, 23, 42, 0.1);
-    --accent-primary: #6366f1;
-    --accent-secondary: #4f46e5;
-    --accent-glow: rgba(99, 102, 241, 0.35);
+    --border-subtle: rgba(15, 23, 42, 0.09);
+    --specular-top: rgba(255, 255, 255, 0.7);
+    --accent-primary: #8b5cf6;
+    --accent-secondary: #06b6d4;
+    --accent-glow: rgba(139, 92, 246, 0.38);
 }
 
 html.dark {
-    --bg-base: #07090e;
-    --bg-surface: #0e131f;
-    --bg-elevated: #151c2c;
+    /* مشکی عمیق اوبر و زغالی ابریشمی مطابق استاندارد Cyber-SaaS */
+    --bg-base: #09090b;
+    --bg-surface: rgba(13, 15, 23, 0.78);
+    --bg-elevated: rgba(20, 23, 34, 0.85);
     --text-main: #f8fafc;
     --text-muted: #94a3b8;
     --border-subtle: rgba(255, 255, 255, 0.08);
+    --specular-top: rgba(255, 255, 255, 0.14);
 }
 
 /* ================= 8 ANIME / GAMING / CINEMA THEMES ================= */
 
 [data-user-theme="default"] {
-    --accent-primary: #6366f1;
-    --accent-secondary: #3b82f6;
-    --accent-glow: rgba(99, 102, 241, 0.4);
+    --accent-primary: #8b5cf6;
+    --accent-secondary: #06b6d4;
+    --accent-glow: rgba(139, 92, 246, 0.42);
 }
 
 [data-user-theme="dracula"] {
     --accent-primary: #a855f7;
     --accent-secondary: #ec4899;
-    --accent-glow: rgba(168, 85, 247, 0.5);
+    --accent-glow: rgba(168, 85, 247, 0.52);
 }
 
 [data-user-theme="forest_emerald"] {
@@ -71,58 +74,179 @@ html.dark {
     --accent-glow: rgba(245, 158, 11, 0.65);
 }
 
-/* Profile Card Banners for Leaderboard & Sidebar */
-.aura-default { background: linear-gradient(135deg, #334155 0%, #1e293b 100%); border: 1px solid #64748b; }
-.aura-dracula { background: linear-gradient(135deg, #6b21a8 0%, #be185d 100%); border: 1px solid #f472b6; box-shadow: 0 0 20px rgba(168,85,247,0.35); }
-.aura-forest_emerald { background: linear-gradient(135deg, #064e3b 0%, #059669 100%); border: 1px solid #34d399; box-shadow: 0 0 20px rgba(16,185,129,0.35); }
-.aura-miku_vocaloid { background: linear-gradient(135deg, #0891b2 0%, #db2777 100%); border: 1px solid #22d3ee; box-shadow: 0 0 22px rgba(6,182,212,0.45); }
-.aura-hollow_void { background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 55%, #0284c7 100%); border: 1px solid #7dd3fc; box-shadow: 0 0 22px rgba(56,189,248,0.45); }
-.aura-cyberpunk_amber { background: linear-gradient(135deg, #ca8a04 0%, #0f172a 60%, #0891b2 100%); border: 1px solid #fde047; box-shadow: 0 0 25px rgba(250,204,21,0.5); }
-.aura-akatsuki_crimson { background: linear-gradient(135deg, #09090b 0%, #7f1d1d 55%, #dc2626 100%); border: 1px solid #f87171; box-shadow: 0 0 25px rgba(239,68,68,0.55); }
-.aura-clair_obscur { background: linear-gradient(135deg, #1c1917 0%, #78350f 50%, #d97706 100%); border: 2px solid #fde047; box-shadow: 0 0 30px rgba(245,158,11,0.65); }
+/* ================= AURA SURFACES ================= */
+.aura-default { background: linear-gradient(135deg, #18181b 0%, #1e1b4b 60%, #0f172a 100%); border: 1px solid rgba(139, 92, 246, 0.45); }
+.aura-dracula { background: linear-gradient(135deg, #3b0764 0%, #831843 60%, #09090b 100%); border: 1px solid #f472b6; box-shadow: 0 0 25px rgba(168,85,247,0.35); }
+.aura-forest_emerald { background: linear-gradient(135deg, #022c22 0%, #065f46 60%, #09090b 100%); border: 1px solid #34d399; box-shadow: 0 0 25px rgba(16,185,129,0.35); }
+.aura-miku_vocaloid { background: linear-gradient(135deg, #083344 0%, #0e7490 50%, #9d174d 100%); border: 1px solid #22d3ee; box-shadow: 0 0 25px rgba(6,182,212,0.45); }
+.aura-hollow_void { background: linear-gradient(135deg, #09090b 0%, #1e1b4b 55%, #0284c7 100%); border: 1px solid #7dd3fc; box-shadow: 0 0 25px rgba(56,189,248,0.45); }
+.aura-cyberpunk_amber { background: linear-gradient(135deg, #713f12 0%, #09090b 55%, #155e75 100%); border: 1px solid #fde047; box-shadow: 0 0 25px rgba(250,204,21,0.45); }
+.aura-akatsuki_crimson { background: linear-gradient(135deg, #09090b 0%, #450a0a 55%, #b91c1c 100%); border: 1px solid #f87171; box-shadow: 0 0 25px rgba(239,68,68,0.5); }
+.aura-clair_obscur { background: linear-gradient(135deg, #0c0a09 0%, #451a03 50%, #b45309 100%); border: 1px solid #fde047; box-shadow: 0 0 30px rgba(245,158,11,0.6); }
 
 html[dir="rtl"] body { font-family: 'Vazirmatn', sans-serif; }
 html[dir="ltr"] body { font-family: 'Inter', sans-serif; }
 .font-display { font-family: 'Space Grotesk', 'Vazirmatn', sans-serif; }
 
+/* ================= AMBIENT GRID & PARTICLES BACKGROUND ================= */
 body {
     background-color: var(--bg-base);
     color: var(--text-main);
-    background-image: radial-gradient(var(--border-subtle) 1px, transparent 1px);
-    background-size: 24px 24px;
+    /* شبکه شطرنجی و ماتریسی با شفافیت ۵٪ */
+    background-image: 
+        linear-gradient(to right, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+        radial-gradient(circle at 50% -10%, var(--accent-glow), transparent 60%);
+    background-size: 36px 36px, 36px 36px, 100% 100%;
     transition: background-color 0.3s ease, color 0.3s ease;
+    overflow-x: hidden;
 }
 
+@keyframes float-ember {
+    0% { transform: translateY(0px) translateX(0px) scale(0.8); opacity: 0; }
+    25% { opacity: 0.55; }
+    75% { opacity: 0.45; }
+    100% { transform: translateY(-120px) translateX(20px) scale(1.2); opacity: 0; }
+}
+
+.ambient-ember {
+    position: fixed;
+    border-radius: 9999px;
+    pointer-events: none;
+    z-index: 0;
+    filter: blur(1px);
+    animation: float-ember linear infinite;
+}
+
+/* ================= BENTO GLASSMORPHISM & RIM LIGHTING ================= */
 .bento-card {
-    background-color: var(--bg-surface);
+    background: var(--bg-surface);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
     border: 1px solid var(--border-subtle);
+    box-shadow: 
+        0 14px 40px -12px rgba(0, 0, 0, 0.5),
+        inset 0 1px 0 0 var(--specular-top);
     border-radius: 1.25rem;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
-    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s ease, box-shadow 0.25s ease;
 }
 
 .bento-card:hover {
-    border-color: var(--accent-primary);
+    border-color: rgba(255, 255, 255, 0.16);
+}
+
+/* Rim Lighting: تپش نوری گدازه‌ای برای باس‌فایت */
+@keyframes pulse-boss-rim {
+    0%, 100% { box-shadow: 0 0 25px -5px rgba(239, 68, 68, 0.35), inset 0 1px 0 0 rgba(248, 113, 113, 0.35); border-color: rgba(239, 68, 68, 0.45); }
+    50% { box-shadow: 0 0 40px -2px rgba(249, 115, 22, 0.55), inset 0 1px 0 0 rgba(251, 146, 60, 0.6); border-color: rgba(249, 115, 22, 0.75); }
+}
+
+.rim-light-boss {
+    animation: pulse-boss-rim 3.5s infinite ease-in-out;
+}
+
+/* Rim Lighting: تپش نئونی برای هوش مصنوعی و کوئست‌ها */
+.rim-light-ai {
+    border: 1px solid rgba(139, 92, 246, 0.4);
+    box-shadow: 0 0 30px -8px var(--accent-glow), inset 0 1px 0 0 rgba(167, 139, 250, 0.3);
+}
+
+/* ================= METALLIC BADGES & RPG BUTTONS ================= */
+.metallic-gold-badge {
+    background: linear-gradient(135deg, #fef08a 0%, #f59e0b 50%, #b45309 100%);
+    color: #09090b;
+    font-weight: 900;
+    box-shadow: 0 0 15px rgba(245, 158, 11, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.metallic-platinum-badge {
+    background: linear-gradient(135deg, #f8fafc 0%, #94a3b8 50%, #475569 100%);
+    color: #09090b;
+    font-weight: 900;
+    box-shadow: 0 0 12px rgba(148, 163, 184, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
 .tactile-btn {
     background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
-    color: #fff;
-    font-weight: 700;
-    border-bottom: 3px solid rgba(0, 0, 0, 0.35);
-    box-shadow: 0 6px 20px -3px var(--accent-glow);
-    transition: all 0.15s ease;
+    color: #ffffff;
+    font-weight: 800;
+    border-top: 1px solid rgba(255, 255, 255, 0.35);
+    border-bottom: 3px solid rgba(0, 0, 0, 0.45);
+    box-shadow: 0 6px 22px -4px var(--accent-glow);
+    transition: all 0.18s ease;
 }
 
 .tactile-btn:hover:not(:disabled) {
     transform: translateY(-2px);
-    filter: brightness(1.08);
+    filter: brightness(1.12);
+    box-shadow: 0 10px 28px -3px var(--accent-glow);
 }
 
-.tactile-btn:active:not(:disabled) {
-    transform: translateY(1px);
-    border-bottom-width: 1px;
+/* دکمه حمله گدازه‌ای (Attack Button) */
+.attack-btn {
+    background: linear-gradient(135deg, #dc2626 0%, #ea580c 50%, #f59e0b 100%);
+    color: #ffffff;
+    font-weight: 900;
+    border-top: 1px solid rgba(254, 215, 170, 0.6);
+    border-bottom: 3px solid #7f1d1d;
+    box-shadow: 0 8px 28px -4px rgba(239, 68, 68, 0.65);
+    transition: all 0.18s ease;
 }
+
+.attack-btn:hover {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 12px 35px -2px rgba(249, 115, 22, 0.85);
+    filter: brightness(1.1);
+}
+
+.attack-btn:active {
+    transform: translateY(1px) scale(0.99);
+}
+
+/* ================= BOSS DAMAGE SHAKE & PARTICLE BURST ================= */
+@keyframes boss-hit-shake {
+    0%, 100% { transform: translate(0, 0) rotate(0deg); }
+    15% { transform: translate(-8px, -4px) rotate(-1.5deg); filter: brightness(1.6) saturate(1.8); }
+    30% { transform: translate(8px, 3px) rotate(1.5deg); }
+    45% { transform: translate(-6px, 2px) rotate(-1deg); }
+    60% { transform: translate(6px, -2px) rotate(1deg); }
+    75% { transform: translate(-3px, 1px) rotate(0deg); }
+}
+
+.boss-shake {
+    animation: boss-hit-shake 0.48s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+@keyframes damage-float-up {
+    0% { opacity: 1; transform: translateY(0) scale(0.7); }
+    40% { opacity: 1; transform: translateY(-28px) scale(1.25); }
+    100% { opacity: 0; transform: translateY(-55px) scale(0.9); }
+}
+
+.damage-pop {
+    animation: damage-float-up 0.95s ease-out forwards;
+    pointer-events: none;
+}
+
+@keyframes particle-fly {
+    0% { opacity: 1; transform: translate(0, 0) scale(1); }
+    100% { opacity: 0; transform: translate(var(--tx), var(--ty)) scale(0); }
+}
+
+.quest-particle {
+    position: fixed;
+    width: 7px;
+    height: 7px;
+    border-radius: 9999px;
+    pointer-events: none;
+    z-index: 9999;
+    animation: particle-fly 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Quest Difficulty Badges */
+.badge-easy { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.35); }
+.badge-hard { background: rgba(139, 92, 246, 0.18); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.45); }
+.badge-legendary { background: linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(239, 68, 68, 0.25)); color: #fde047; border: 1px solid rgba(250, 204, 21, 0.6); box-shadow: 0 0 12px rgba(245, 158, 11, 0.3); }
 
 .text-accent { color: var(--accent-primary); }
 .border-accent { border-color: var(--accent-primary); }

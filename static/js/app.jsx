@@ -65,41 +65,49 @@
 }
 const ambientEngine = new AmbientSynthEngine();
 
-const { useState, useEffect } = React;
+const { useState, useEffect, useRef } = React;
 
 const EXTRA_I18N = {
     fa: {
-        ambient_player_title: "صدای محیطی تمرکز",
+        ambient_player_title: "سیستم صوتی محیطی (Lo-Fi & Synth)",
         sound_none: "خاموش 🔇",
         sound_rain: "باران 🌧️",
         sound_whitenoise: "وایت‌نویز 📻",
-        sound_lofidrone: "لو-فای کیهانی 🌌",
-        quiz_modal_title: "کوئیز اثبات مطالعه Gemini 🧠",
-        quiz_modal_sub: "به سوالات زیر بر اساس مبحث مطالعه‌شده پاسخ بده (هر پاسخ صحیح = +۵ سکه پاداش!)",
-        quiz_claim_btn: "ثبت پاسخ‌ها و دریافت پاداش ✨",
+        sound_lofidrone: "سینت کیهانی 🌌",
+        quiz_modal_title: "چالش اثبات مطالعه Gemini 🧠",
+        quiz_modal_sub: "پاسخ صحیح به هر سوال = +۵ سکه طلایی و شارژ کریتیکال!",
+        quiz_claim_btn: "ثبت پاسخ و دریافت پاداش ✨",
         quiz_skip_btn: "بستن",
-        heatmap_title: "تقویم حرارتی استمرار مطالعه (۱۲۰ روز اخیر)",
-        heatmap_sub: "هر خانه نشان‌دهنده میزان مطالعه روزانه شماست",
+        heatmap_title: "ماتریس حرارتی استمرار مطالعه (۱۲۰ روز اخیر)",
+        heatmap_sub: "ردپای تمرکز روزانه شما در شبکه نئونی",
+        hero_boss_badge: "⚔️ نبرد زنده با غول (LIVE BOSS ENCOUNTER)",
+        hero_sim_boss_name: "آرش‌لیچ امتحانات پایان‌ترم و کنکور",
+        hero_attack_cta: "⚔️ حمله با تایمر فوکوس (شروع پومودورو)",
+        hero_test_strike: "💥 ضربه آزمایشی (-25 HP)",
+        hero_boss_hint: "هر ۱ دقیقه فوکوس در پومودورو یا تکمیل مأموریت‌های روزانه از خون این غول کم می‌کند!",
+        quest_board_title: "تخته مأموریت‌های روزانه (Quest Log)",
+        quest_board_courses: "مأموریت‌های درسی فعال (Active Quests)",
+        diff_easy: "EASY",
+        diff_hard: "HARD",
+        diff_legendary: "LEGENDARY",
         raid_title: "نبرد با غول گروهی (Guild Boss Raid)",
         raid_sub: "هر ۱ دقیقه پومودوروی اعضا = ۱ ضربه (Damage) به جان باس!",
         raid_step1_label: "۱. نام درس یا هدف (برای ساخت نام غول توسط Gemini):",
         raid_course_ph: "مثلاً: ساختمان داده، هوش مصنوعی، ریاضی ۱...",
         raid_ai_suggest_btn: "پیشنهاد نام غول با Gemini ✨",
         raid_ai_loading: "در حال خلق نام...",
-        raid_boss_final_label: "نام انتخاب‌شده برای غول:",
         raid_boss_name_ph: "نام غول (یا با دکمه بالا توسط هوش مصنوعی بسازید)",
         raid_step2_label: "۲. تعیین مقدار جان غول (Boss HP - هر ۱ دقیقه پومودورو = ۱ اچ‌پی):",
         raid_hp_Convert_rule: "قانون ثابت پاداش: به ازای هر ۲۵ اچ‌پی، دقیقاً ۱۰ سکه به اعضا پاداش داده می‌شود.",
         raid_locked_bounty: "پاداش قفل‌شده این باس:",
         raid_create_btn: "احضار غول نبرد ⚔️",
         raid_defeated: "شکست خورد! پاداش به اعضا واریز شد 🏆",
-        raid_top_dmg: "بیشترین ضربه‌زنندگان (کلیک برای مشاهده پروفایل):",
-        squad_members: "اعضای گروه مطالعه (کلیک روی هر نفر برای دیدن پروفایل)",
-        click_profile_hint: "برای مشاهده کارت پروفایل روی نام کاربران کلیک کنید 👤",
-        profile_modal_badge: "کارت پروفایل بازیکن",
+        raid_top_dmg: "قهرمانان ضربه‌زننده (کلیک برای مشاهده کارت RPG):",
+        squad_members: "اعضای کلن (کلیک روی هر نفر برای دیدن کارت کاراکتر)",
+        click_profile_hint: "برای مشاهده کارت هولوگرافیک ۳ بعدی روی نام کاربران کلیک کنید 👤",
         profile_pomos: "پومودوروهای موفق",
-        profile_raid_dmg: "کل ضربه به باس‌ها",
-        profile_member_since: "تاریخ عضویت",
+        profile_raid_dmg: "کل دمیج به باس‌ها",
+        profile_member_since: "تاریخ ورود به سیستم",
         close_btn: "بستن"
     },
     en: {
@@ -108,32 +116,40 @@ const EXTRA_I18N = {
         sound_rain: "Rain 🌧️",
         sound_whitenoise: "White Noise 📻",
         sound_lofidrone: "Cosmic Lo-Fi 🌌",
-        quiz_modal_title: "Gemini Proof-of-Study Quiz 🧠",
-        quiz_modal_sub: "Answer based on your study session (+5 Bonus Coins per correct answer!)",
-        quiz_claim_btn: "Submit & Claim Bonus Coins ✨",
+        quiz_modal_title: "Gemini Proof-of-Study Trial 🧠",
+        quiz_modal_sub: "Each correct answer grants +5 Bonus Gold & Critical XP!",
+        quiz_claim_btn: "Submit & Claim Bounty ✨",
         quiz_skip_btn: "Close",
-        heatmap_title: "Study Activity Heatmap (Last 120 Days)",
-        heatmap_sub: "Daily focus intensity grid inspired by GitHub",
+        heatmap_title: "120-Day Focus Continuum Matrix",
+        heatmap_sub: "Your daily study intensity tracked on the cyber grid",
+        hero_boss_badge: "⚔️ LIVE BOSS ENCOUNTER",
+        hero_sim_boss_name: "Arch-Lich of Final Exams & Deadlines",
+        hero_attack_cta: "⚔️ Attack: Engage Focus Timer",
+        hero_test_strike: "💥 Test Strike (-25 HP)",
+        hero_boss_hint: "Every 1 minute of Pomodoro focus or completed Quest deals direct damage to the Boss HP!",
+        quest_board_title: "Daily Quest Board",
+        quest_board_courses: "Active Course Quests",
+        diff_easy: "EASY",
+        diff_hard: "HARD",
+        diff_legendary: "LEGENDARY",
         raid_title: "Guild Boss Raid",
         raid_sub: "Every 1 minute of completed Pomodoro deals 1 Damage to the Boss!",
         raid_step1_label: "1. Enter Course or Goal (for Gemini AI Boss Naming):",
         raid_course_ph: "e.g. Data Structures, Artificial Intelligence, Calculus...",
         raid_ai_suggest_btn: "Generate Boss Name with Gemini ✨",
         raid_ai_loading: "Summoning Names...",
-        raid_boss_final_label: "Selected Boss Name:",
         raid_boss_name_ph: "Boss Title (or click AI Generate above)",
         raid_step2_label: "2. Enter Boss HP (Every 1 min of Pomodoro = 1 HP Damage):",
         raid_hp_Convert_rule: "Fixed Bounty Formula: Every 25 HP automatically grants 10 Coins (Non-editable).",
         raid_locked_bounty: "Locked Boss Bounty:",
         raid_create_btn: "Summon Raid Boss ⚔️",
         raid_defeated: "Defeated! Bounty awarded to contributors 🏆",
-        raid_top_dmg: "Top Damage Dealers (Click to view profile):",
-        squad_members: "Squad Members (Click any member to inspect profile)",
-        click_profile_hint: "Click on any player's name to inspect their themed Profile Card 👤",
-        profile_modal_badge: "Operative Profile Card",
+        raid_top_dmg: "Top Damage Dealers (Click to inspect RPG Card):",
+        squad_members: "Guild Operatives (Click any member to inspect RPG Card)",
+        click_profile_hint: "Click on any operative's name to inspect their 3D Holographic Character Card 👤",
         profile_pomos: "Verified Pomodoros",
         profile_raid_dmg: "Total Boss Damage",
-        profile_member_since: "Joined",
+        profile_member_since: "Operative Since",
         close_btn: "Close"
     }
 };
@@ -156,6 +172,43 @@ function playSynthChime() {
     } catch (e) {}
 }
 
+function playSwordSlashSound() {
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sawtooth";
+        osc.frequency.setValueAtTime(280, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(55, ctx.currentTime + 0.22);
+        gain.gain.setValueAtTime(0.25, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.24);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.24);
+    } catch (e) {}
+}
+
+/* افکت انفجار ذرات هنگام تیک زدن کوئست یا ضربه به باس */
+function spawnParticleBurst(clientX, clientY, colors = ["#facc15", "#a855f7", "#06b6d4", "#ef4444", "#10b981"]) {
+    const x = clientX || window.innerWidth / 2;
+    const y = clientY || window.innerHeight / 2;
+    for (let i = 0; i < 20; i++) {
+        const p = document.createElement("div");
+        p.className = "quest-particle";
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 35 + Math.random() * 85;
+        p.style.left = `${x}px`;
+        p.style.top = `${y}px`;
+        p.style.backgroundColor = colors[i % colors.length];
+        p.style.boxShadow = `0 0 10px ${colors[i % colors.length]}`;
+        p.style.setProperty("--tx", `${Math.cos(angle) * dist}px`);
+        p.style.setProperty("--ty", `${Math.sin(angle) * dist}px`);
+        document.body.appendChild(p);
+        setTimeout(() => p.remove(), 750);
+    }
+}
+
 function getTomorrowISO() {
     const d = new Date();
     d.setDate(d.getDate() + 1);
@@ -164,6 +217,226 @@ function getTomorrowISO() {
 
 function getTodayISO() {
     return new Date().toISOString().split("T")[0];
+}
+
+/* ۱. کامپوننت ذرات نوری معلق پس‌زمینه (Ambient Floating Embers) */
+function AmbientEmbers() {
+    const embers = [
+        { left: "8%", top: "85%", size: 4, color: "#8b5cf6", dur: "11s", delay: "0s" },
+        { left: "22%", top: "90%", size: 3, color: "#06b6d4", dur: "14s", delay: "2s" },
+        { left: "38%", top: "80%", size: 5, color: "#f59e0b", dur: "9s", delay: "1s" },
+        { left: "55%", top: "92%", size: 3, color: "#ec4899", dur: "13s", delay: "3s" },
+        { left: "72%", top: "88%", size: 4, color: "#10b981", dur: "12s", delay: "0.5s" },
+        { left: "88%", top: "82%", size: 5, color: "#ef4444", dur: "10s", delay: "2.5s" }
+    ];
+    return (
+        <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+            {embers.map((em, i) => (
+                <span
+                    key={i}
+                    className="ambient-ember"
+                    style={{
+                        left: em.left,
+                        top: em.top,
+                        width: `${em.size}px`,
+                        height: `${em.size}px`,
+                        backgroundColor: em.color,
+                        boxShadow: `0 0 12px ${em.color}`,
+                        animationDuration: em.dur,
+                        animationDelay: em.delay
+                    }}
+                ></span>
+            ))}
+        </div>
+    );
+}
+
+/* ۲. کارت پروفایل هولوگرافیک ۳ بعدی با افکت Tilt on Hover و بج متالیک */
+function HolographicRPGCard(props) {
+    const { stats, activeThemeObj, lang, t, onClick } = props;
+    const cardRef = useRef(null);
+    const [tiltStyle, setTiltStyle] = useState({});
+
+    const handleMouseMove = (e) => {
+        if (!cardRef.current) return;
+        const rect = cardRef.current.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        const rotateY = ((x / rect.width) - 0.5) * 18;
+        const rotateX = ((0.5 - (y / rect.height)) * 18);
+        setTiltStyle({
+            transform: `perspective(900px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(1.02)`,
+            transition: "transform 0.08s ease-out"
+        });
+    };
+
+    const handleMouseLeave = () => {
+        setTiltStyle({
+            transform: "perspective(900px) rotateX(0deg) rotateY(0deg) scale(1)",
+            transition: "transform 0.4s ease-out"
+        });
+    };
+
+    const xpPct = Math.min(100, Math.round(((stats.xp || 0) / (stats.next_level_xp || 150)) * 100));
+
+    return (
+        <div
+            ref={cardRef}
+            onClick={onClick}
+            onMouseMove={handleMouseMove}
+            onMouseLeave={handleMouseLeave}
+            style={tiltStyle}
+            title={t("click_profile_hint")}
+            className={`p-4 rounded-2xl text-white space-y-3.5 cursor-pointer relative overflow-hidden aura-${stats.active_theme || 'default'}`}
+        >
+            {/* هایلایت هولوگرافیک */}
+            <div className="flex items-start justify-between gap-2">
+                <div>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="px-2 py-0.5 rounded-md metallic-gold-badge text-[10px] tracking-wider">
+                            LVL {stats.level || 1}
+                        </span>
+                        <span className="px-2 py-0.5 rounded-md metallic-platinum-badge text-[10px]">
+                            {lang === "fa" ? (stats.title_fa || "نوآموز خواب‌آلود") : (stats.title || "Sleepy Novice")}
+                        </span>
+                    </div>
+                    <h3 className="font-extrabold text-lg mt-2 flex items-center gap-1.5 tracking-tight">
+                        <span>{stats.username}</span>
+                        <span className="text-xs opacity-80">⚡</span>
+                    </h3>
+                    <span className="text-[10px] opacity-80 block">
+                        {activeThemeObj ? (lang === "fa" ? activeThemeObj.name_fa : activeThemeObj.name) : "Cyber Slate"}
+                    </span>
+                </div>
+                <span className="px-2.5 py-1 rounded-xl bg-black/50 border border-white/15 backdrop-blur-md text-xs font-black text-amber-300">
+                    #{stats.leaderboard_rank}
+                </span>
+            </div>
+
+            {/* HUD XP Bar */}
+            <div className="space-y-1 bg-black/35 p-2.5 rounded-xl border border-white/10">
+                <div className="flex justify-between text-[10px] font-bold">
+                    <span className="text-cyan-300">HUD XP</span>
+                    <span>{stats.xp || 0} / {stats.next_level_xp || 150} ({xpPct}%)</span>
+                </div>
+                <div className="w-full h-2 bg-black/60 rounded-full overflow-hidden">
+                    <div
+                        className="h-full bg-gradient-to-r from-violet-500 via-cyan-400 to-amber-300 rounded-full transition-all duration-500"
+                        style={{ width: `${xpPct}%` }}
+                    ></div>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+                <div className="bg-black/40 border border-white/10 rounded-xl p-2 text-center">
+                    <span className="block text-sm font-black text-amber-300">{stats.coins} 🪙</span>
+                    <span className="text-[10px] opacity-75">{t("coins_unit")}</span>
+                </div>
+                <div className="bg-black/40 border border-white/10 rounded-xl p-2 text-center">
+                    <span className="block text-sm font-black text-orange-400">{stats.current_streak} / 7 🔥</span>
+                    <span className="text-[10px] opacity-75">{t("day_label")}</span>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/* ۳. سکشن Hero اینتراکتیو با ماک‌آپ زنده باس‌فایت و دکمه Attack */
+function LiveBossEncounterHero(props) {
+    const { activeRaid, lang, t, onEngagePomodoro } = props;
+    const [simHp, setSimHp] = useState(2400);
+    const maxSimHp = 3000;
+    const [shaking, setShaking] = useState(false);
+    const [dmgPops, setDmgPops] = useState([]);
+
+    const bossTitle = activeRaid ? activeRaid.boss_name : t("hero_sim_boss_name");
+    const currentHp = activeRaid ? activeRaid.current_hp : simHp;
+    const maxHp = activeRaid ? activeRaid.max_hp : maxSimHp;
+    const rewardCoins = activeRaid ? activeRaid.reward_coins : 1200;
+    const hpPercent = Math.max(0, Math.min(100, Math.round((currentHp / maxHp) * 100)));
+
+    const triggerTestStrike = (e) => {
+        playSwordSlashSound();
+        spawnParticleBurst(e.clientX, e.clientY, ["#ef4444", "#f97316", "#facc15"]);
+        setShaking(true);
+        setTimeout(() => setShaking(false), 500);
+
+        if (!activeRaid) {
+            setSimHp(prev => (prev <= 50 ? maxSimHp : prev - 25));
+        }
+
+        const id = Date.now() + Math.random();
+        setDmgPops(prev => [...prev, { id, text: "-25 HP CRITICAL! ⚔️" }]);
+        setTimeout(() => {
+            setDmgPops(prev => prev.filter(p => p.id !== id));
+        }, 950);
+    };
+
+    return (
+        <div className={`bento-card rim-light-boss p-6 sm:p-7 relative overflow-hidden bg-gradient-to-br from-zinc-950 via-red-950/25 to-zinc-950 ${shaking ? "boss-shake" : ""}`}>
+            {/* نمایش اعداد دمیج شناور */}
+            <div className="absolute top-6 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center">
+                {dmgPops.map(p => (
+                    <span key={p.id} className="damage-pop text-lg sm:text-xl font-black text-amber-300 drop-shadow-[0_2px_10px_rgba(239,68,68,0.9)]">
+                        {p.text}
+                    </span>
+                ))}
+            </div>
+
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
+                <div className="space-y-3 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className="px-3 py-1 rounded-full bg-red-500/20 border border-red-500/50 text-red-300 text-[11px] font-black tracking-wider">
+                            {t("hero_boss_badge")}
+                        </span>
+                        <span className="px-3 py-1 rounded-full metallic-gold-badge text-[11px]">
+                            BOUNTY: +{rewardCoins} 🪙
+                        </span>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                        <span className="text-3xl sm:text-4xl">🐉</span>
+                        <div>
+                            <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">{bossTitle}</h2>
+                            <p className="text-xs text-slate-400 mt-0.5">{t("hero_boss_hint")}</p>
+                        </div>
+                    </div>
+
+                    {/* نوار سلامتی گدازه‌ای بزرگ (Molten Boss HP Bar) */}
+                    <div className="space-y-1.5 pt-1">
+                        <div className="flex justify-between text-xs font-black">
+                            <span className="text-red-400">BOSS HEALTH (HP)</span>
+                            <span className="text-amber-300 font-display">{currentHp} / {maxHp} HP ({hpPercent}%)</span>
+                        </div>
+                        <div className="w-full h-4 bg-black/80 rounded-full overflow-hidden border border-red-500/40 p-0.5">
+                            <div
+                                className="h-full bg-gradient-to-r from-red-600 via-orange-500 to-amber-400 rounded-full transition-all duration-300 shadow-[0_0_15px_rgba(239,68,68,0.8)]"
+                                style={{ width: `${hpPercent}%` }}
+                            ></div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* دکمه‌های اکشن و حمله (Attack Controls) */}
+                <div className="flex flex-col sm:flex-row lg:flex-col gap-2.5 shrink-0">
+                    <button
+                        type="button"
+                        onClick={onEngagePomodoro}
+                        className="attack-btn px-6 py-3.5 rounded-2xl text-xs sm:text-sm flex items-center justify-center gap-2"
+                    >
+                        <span>{t("hero_attack_cta")}</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={triggerTestStrike}
+                        className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-red-500/20 border border-red-500/30 text-red-200 text-xs font-bold transition"
+                    >
+                        {t("hero_test_strike")}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
 }
 
 function StudyHeatmap(props) {
@@ -184,7 +457,10 @@ function StudyHeatmap(props) {
     return (
         <div className="bento-card p-6 space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                <h3 className="font-black text-base">{t("heatmap_title")}</h3>
+                <h3 className="font-black text-base flex items-center gap-2">
+                    <span className="text-accent">💠</span>
+                    <span>{t("heatmap_title")}</span>
+                </h3>
                 <span className="text-xs text-slate-400">{t("heatmap_sub")}</span>
             </div>
             <div className="flex flex-wrap gap-1.5 pt-2">
@@ -345,7 +621,7 @@ function RaidSummonForm(props) {
                 <p className="text-[10px] text-slate-400">{t("raid_hp_Convert_rule")}</p>
             </div>
 
-            <button type="submit" className="w-full py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-black text-xs shadow-lg transition">
+            <button type="submit" className="w-full py-2.5 rounded-xl attack-btn text-xs">
                 {t("raid_create_btn")}
             </button>
         </form>
@@ -544,6 +820,7 @@ function App() {
         try {
             const res = await api(`/pomodoro/${sid}/complete`, { method: "POST" });
             playSynthChime();
+            spawnParticleBurst(window.innerWidth / 2, window.innerHeight / 2);
             const bonusText = res.streak_bonus_coins > 0
                 ? ` + ${res.streak_bonus_coins} 🔥 Streak Bonus!`
                 : "";
@@ -626,20 +903,31 @@ function App() {
 
     const activeThemeObj = themes.find(th => th.id === (stats?.active_theme || "default"));
 
+    // پیدا کردن اولین باس فعال کاربر در گروه‌ها برای نمایش در سکشن Hero
+    let firstActiveRaid = null;
+    Object.values(groupRaids).forEach(rList => {
+        if (Array.isArray(rList)) {
+            const found = rList.find(r => r.status === "active");
+            if (found && !firstActiveRaid) firstActiveRaid = found;
+        }
+    });
+
     return (
-        <div className="min-h-screen flex flex-col lg:flex-row">
+        <div className="min-h-screen flex flex-col lg:flex-row relative z-10">
+            <AmbientEmbers />
+
             {toast && (
-                <div className={`fixed bottom-6 right-6 z-50 px-5 py-3.5 rounded-2xl shadow-2xl border font-bold text-sm flex items-center gap-3 ${toast.type === 'error' ? 'bg-red-950/95 border-red-500 text-red-200' : 'bg-slate-900/95 border-accent text-white'}`}>
+                <div className={`fixed bottom-6 right-6 z-50 px-5 py-3.5 rounded-2xl shadow-2xl border font-bold text-sm flex items-center gap-3 ${toast.type === 'error' ? 'bg-red-950/95 border-red-500 text-red-200' : 'bg-zinc-900/95 border-accent text-white'}`}>
                     <span>{toast.type === "error" ? "⚠️" : "⚡"}</span>
                     <span>{toast.msg}</span>
                 </div>
             )}
 
-            {/* PUBLIC USER PROFILE POPUP MODAL */}
+            {/* PUBLIC USER PROFILE POPUP MODAL (RPG CHARACTER SHEET) */}
             {inspectedProfile && (
                 <div
                     onClick={() => setInspectedProfile(null)}
-                    className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4"
+                    className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4"
                 >
                     <div
                         onClick={(e) => e.stopPropagation()}
@@ -647,17 +935,17 @@ function App() {
                     >
                         <div className="flex items-start justify-between">
                             <div>
-                                <span className="text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full bg-black/45 border border-white/20">
+                                <span className="text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full bg-black/50 border border-white/20">
                                     {inspectedProfile.rarity} • {lang === "fa" ? inspectedProfile.theme_name_fa : inspectedProfile.theme_name}
                                 </span>
                                 <h2 className="text-3xl font-black mt-3 flex items-center gap-2">
                                     <span>{inspectedProfile.username}</span>
                                 </h2>
-                                <div className="flex items-center gap-2 mt-1.5">
-                                    <span className="px-2.5 py-0.5 rounded-lg bg-amber-400 text-slate-950 text-xs font-black">
+                                <div className="flex flex-wrap items-center gap-2 mt-2">
+                                    <span className="px-2.5 py-0.5 rounded-lg metallic-gold-badge text-xs">
                                         LVL {inspectedProfile.level}
                                     </span>
-                                    <span className="text-sm font-extrabold text-amber-200">
+                                    <span className="px-2.5 py-0.5 rounded-lg metallic-platinum-badge text-xs">
                                         {lang === "fa" ? inspectedProfile.title_fa : inspectedProfile.title}
                                     </span>
                                 </div>
@@ -670,34 +958,34 @@ function App() {
                             </button>
                         </div>
 
-                        <div className="bg-black/35 p-3.5 rounded-2xl space-y-1.5 backdrop-blur-sm">
+                        <div className="bg-black/40 p-3.5 rounded-2xl space-y-1.5 border border-white/10 backdrop-blur-sm">
                             <div className="flex justify-between text-xs font-bold">
-                                <span>XP Progress</span>
+                                <span className="text-cyan-300">HUD XP</span>
                                 <span>{inspectedProfile.xp} / {inspectedProfile.next_level_xp} XP</span>
                             </div>
-                            <div className="w-full h-2.5 bg-black/50 rounded-full overflow-hidden">
+                            <div className="w-full h-2.5 bg-black/60 rounded-full overflow-hidden">
                                 <div
-                                    className="h-full bg-gradient-to-r from-amber-400 to-yellow-200 rounded-full"
+                                    className="h-full bg-gradient-to-r from-violet-500 via-cyan-400 to-amber-300 rounded-full"
                                     style={{ width: `${Math.min(100, (inspectedProfile.xp / (inspectedProfile.next_level_xp || 150)) * 100)}%` }}
                                 ></div>
                             </div>
                         </div>
 
                         <div className="grid grid-cols-2 gap-3">
-                            <div className="bg-black/35 backdrop-blur-sm p-3.5 rounded-2xl text-center">
+                            <div className="bg-black/40 border border-white/10 p-3.5 rounded-2xl text-center">
                                 <span className="text-xl font-black text-amber-300 block">{inspectedProfile.coins} 🪙</span>
                                 <span className="text-[11px] opacity-80">{t("coins_unit")}</span>
                             </div>
-                            <div className="bg-black/35 backdrop-blur-sm p-3.5 rounded-2xl text-center">
-                                <span className="text-xl font-black text-orange-300 block">{inspectedProfile.current_streak} 🔥</span>
+                            <div className="bg-black/40 border border-white/10 p-3.5 rounded-2xl text-center">
+                                <span className="text-xl font-black text-orange-400 block">{inspectedProfile.current_streak} 🔥</span>
                                 <span className="text-[11px] opacity-80">{t("day_label")}</span>
                             </div>
-                            <div className="bg-black/35 backdrop-blur-sm p-3.5 rounded-2xl text-center">
+                            <div className="bg-black/40 border border-white/10 p-3.5 rounded-2xl text-center">
                                 <span className="text-xl font-black text-emerald-300 block">{inspectedProfile.total_study_hours} {t("hours_short")}</span>
                                 <span className="text-[11px] opacity-80">{t("profile_pomos")}: {inspectedProfile.total_pomodoros} 🍅</span>
                             </div>
-                            <div className="bg-black/35 backdrop-blur-sm p-3.5 rounded-2xl text-center">
-                                <span className="text-xl font-black text-red-300 block">{inspectedProfile.total_raid_damage} ⚔️</span>
+                            <div className="bg-black/40 border border-white/10 p-3.5 rounded-2xl text-center">
+                                <span className="text-xl font-black text-red-400 block">{inspectedProfile.total_raid_damage} ⚔️</span>
                                 <span className="text-[11px] opacity-80">{t("profile_raid_dmg")}</span>
                             </div>
                         </div>
@@ -718,7 +1006,7 @@ function App() {
             {/* Post-Pomodoro AI Quiz Modal */}
             {quizModal && (
                 <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-                    <div className="bento-card w-full max-w-lg p-6 sm:p-8 space-y-5">
+                    <div className="bento-card rim-light-ai w-full max-w-lg p-6 sm:p-8 space-y-5">
                         <div>
                             <h2 className="text-xl font-black text-accent">{t("quiz_modal_title")}</h2>
                             <p className="text-xs text-slate-400 mt-1">{t("quiz_modal_sub")}</p>
@@ -766,11 +1054,11 @@ function App() {
 
             {/* Auth Modal */}
             {showAuthModal && (
-                <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-                    <div className="bento-card w-full max-w-md p-7 space-y-6">
+                <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+                    <div className="bento-card rim-light-ai w-full max-w-md p-7 space-y-6">
                         <div className="flex items-center justify-between">
                             <div>
-                                <h2 className="text-2xl font-black font-display">Study<span className="text-accent">Mate</span> OS</h2>
+                                <h2 className="text-2xl font-black font-display">Study<span className="text-accent">Mate</span> Neo-RPG</h2>
                                 <p className="text-xs text-slate-400 mt-0.5">{t("app_subtitle")}</p>
                             </div>
                             <button onClick={() => setLang(lang === "fa" ? "en" : "fa")} className="px-3 py-1.5 rounded-xl border border-slate-700 text-xs font-bold">
@@ -810,94 +1098,50 @@ function App() {
                 </div>
             )}
 
-            {/* Tactical Command Sidebar */}
-            <aside className="lg:w-72 shrink-0 border-b lg:border-b-0 lg:border-e border-slate-800/40 bg-white/60 dark:bg-slate-950/70 backdrop-blur-xl p-5 flex flex-col justify-between gap-6">
+            {/* Tactical Neo-RPG Sidebar */}
+            <aside className="lg:w-76 shrink-0 border-b lg:border-b-0 lg:border-e border-white/10 bg-zinc-950/80 backdrop-blur-2xl p-5 flex flex-col justify-between gap-6">
                 <div className="space-y-5">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-xl tactile-btn flex items-center justify-center font-display font-black text-xl">S</div>
                             <div>
                                 <h1 className="font-display font-black text-lg leading-none">Study<span className="text-accent">Mate</span></h1>
-                                <span className="text-[11px] text-slate-400">v2.1 React OS</span>
+                                <span className="text-[10px] text-cyan-400 font-bold tracking-wider uppercase">Cyber-SaaS RPG</span>
                             </div>
                         </div>
                         <div className="flex items-center gap-1.5">
-                            <button onClick={() => setLang(lang === "fa" ? "en" : "fa")} className="px-2.5 py-1.5 rounded-lg border border-slate-700/40 text-xs font-bold hover:border-accent">
+                            <button onClick={() => setLang(lang === "fa" ? "en" : "fa")} className="px-2.5 py-1.5 rounded-lg border border-white/10 text-xs font-bold hover:border-accent">
                                 {lang === "fa" ? "EN" : "FA"}
                             </button>
-                            <button onClick={() => setDarkMode(!darkMode)} className="px-2.5 py-1.5 rounded-lg border border-slate-700/40 text-xs">
+                            <button onClick={() => setDarkMode(!darkMode)} className="px-2.5 py-1.5 rounded-lg border border-white/10 text-xs">
                                 {darkMode ? "☀️" : "🌙"}
                             </button>
                         </div>
                     </div>
 
+                    {/* 3D Tilt Gamer Profile Card */}
                     {stats && (
-                        <div
+                        <HolographicRPGCard
+                            stats={stats}
+                            activeThemeObj={activeThemeObj}
+                            lang={lang}
+                            t={t}
                             onClick={() => openUserProfile(stats.user_id)}
-                            title={t("click_profile_hint")}
-                            className={`p-4 rounded-2xl text-white space-y-3 cursor-pointer transform hover:scale-[1.02] transition aura-${stats.active_theme || 'default'}`}
-                        >
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <div className="flex items-center gap-1.5">
-                                        <span className="px-2 py-0.5 rounded-md bg-black/45 text-[10px] font-black text-amber-300 border border-amber-400/30">
-                                            LVL {stats.level || 1}
-                                        </span>
-                                        <span className="text-[11px] font-bold text-slate-100">
-                                            {lang === "fa" ? (stats.title_fa || "نوآموز خواب‌آلود") : (stats.title || "Sleepy Novice")}
-                                        </span>
-                                    </div>
-                                    <h3 className="font-extrabold text-lg mt-1 flex items-center gap-1.5">
-                                        <span>{stats.username}</span>
-                                        <span className="text-xs opacity-75">👤</span>
-                                    </h3>
-                                    <span className="text-[10px] opacity-75 block">
-                                        🎨 {activeThemeObj ? (lang === "fa" ? activeThemeObj.name_fa : activeThemeObj.name) : "Classic"}
-                                    </span>
-                                </div>
-                                <span className="px-2.5 py-1 rounded-lg bg-black/35 backdrop-blur-md text-xs font-bold">
-                                    #{stats.leaderboard_rank}
-                                </span>
-                            </div>
-
-                            <div className="space-y-1">
-                                <div className="flex justify-between text-[10px] opacity-85 font-bold">
-                                    <span>XP</span>
-                                    <span>{stats.xp || 0} / {stats.next_level_xp || 150}</span>
-                                </div>
-                                <div className="w-full h-1.5 bg-black/40 rounded-full overflow-hidden">
-                                    <div
-                                        className="h-full bg-gradient-to-r from-amber-400 to-yellow-200 rounded-full transition-all duration-500"
-                                        style={{ width: `${Math.min(100, ((stats.xp || 0) / (stats.next_level_xp || 150)) * 100)}%` }}
-                                    ></div>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-2 pt-1">
-                                <div className="bg-black/30 rounded-xl p-2 text-center">
-                                    <span className="block text-sm font-black text-amber-300">{stats.coins} 🪙</span>
-                                    <span className="text-[10px] opacity-80">{t("coins_unit")}</span>
-                                </div>
-                                <div className="bg-black/30 rounded-xl p-2 text-center">
-                                    <span className="block text-sm font-black text-orange-300">{stats.current_streak} / 7 🔥</span>
-                                    <span className="text-[10px] opacity-80">{t("day_label")}</span>
-                                </div>
-                            </div>
-                        </div>
+                        ></HolographicRPGCard>
                     )}
 
                     <nav className="flex lg:flex-col gap-1.5 overflow-x-auto">
                         {[
                             { id: "dashboard", label: t("nav_dashboard"), icon: "⚡" },
-                            { id: "pomodoro", label: t("nav_pomodoro"), icon: "⏱️" },
-                            { id: "ai", label: t("nav_ai"), icon: "🧠" },
-                            { id: "shop", label: t("nav_shop"), icon: "🎨" },
+                            { id: "pomodoro", label: t("nav_pomodoro"), icon: "⚔️" },
+                            { id: "ai", label: t("nav_ai"), icon: "📜" },
+                            { id: "shop", label: t("nav_shop"), icon: "🔮" },
                             { id: "arena", label: t("nav_arena"), icon: "🏆" }
                         ].map(item => (
                             <button
                                 key={item.id}
                                 onClick={() => setActiveTab(item.id)}
-                                className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold whitespace-nowrap transition ${activeTab === item.id ? "tactile-btn" : "text-slate-400 hover:bg-elevated"}`}
+                                className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold whitespace-nowrap transition ${activeTab === item.id ? "tactile-btn" : "text-slate-400 hover:bg-white/5"}`}
                             >
                                 <span>{item.icon}</span>
                                 <span>{item.label}</span>
@@ -905,7 +1149,7 @@ function App() {
                         ))}
                     </nav>
 
-                    <div className="p-3.5 rounded-2xl bg-elevated border border-slate-800/60 space-y-2.5">
+                    <div className="p-3.5 rounded-2xl bg-elevated border border-white/10 space-y-2.5">
                         <span className="text-[11px] font-black text-slate-300 block">🎧 {t("ambient_player_title")}</span>
                         <div className="grid grid-cols-2 gap-1.5">
                             {[
@@ -917,7 +1161,7 @@ function App() {
                                 <button
                                     key={snd.id}
                                     onClick={() => handleAmbientChange(snd.id)}
-                                    className={`py-1.5 px-2 rounded-lg text-[10px] font-bold transition ${ambientType === snd.id ? "tactile-btn" : "bg-black/20 text-slate-400 hover:text-white"}`}
+                                    className={`py-1.5 px-2 rounded-lg text-[10px] font-bold transition ${ambientType === snd.id ? "tactile-btn" : "bg-black/30 text-slate-400 hover:text-white"}`}
                                 >
                                     {snd.label}
                                 </button>
@@ -931,7 +1175,7 @@ function App() {
                                 step="0.05"
                                 value={ambientVol}
                                 onChange={(e) => handleVolumeChange(e.target.value)}
-                                className="w-full accent-indigo-500 h-1 cursor-pointer"
+                                className="w-full accent-violet-500 h-1 cursor-pointer"
                             />
                         )}
                     </div>
@@ -954,6 +1198,15 @@ function App() {
             <main className="flex-1 p-4 sm:p-8 max-w-6xl mx-auto w-full space-y-6">
                 {activeTab === "dashboard" && stats && (
                     <div className="space-y-6">
+                        {/* ۱. سکشن Hero با باس‌فایت زنده و دکمه Attack */}
+                        <LiveBossEncounterHero
+                            activeRaid={firstActiveRaid}
+                            lang={lang}
+                            t={t}
+                            onEngagePomodoro={() => setActiveTab("pomodoro")}
+                        ></LiveBossEncounterHero>
+
+                        {/* ۲. چرخه پاداش استریک ۷ روزه */}
                         <div className="bento-card p-6 space-y-4">
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                                 <div>
@@ -975,7 +1228,7 @@ function App() {
                                     return (
                                         <div
                                             key={dayNum}
-                                            className={`p-3 rounded-xl border text-center transition ${isCurrent ? "border-orange-400 bg-orange-500/20 scale-105 shadow-lg" : isUnlocked ? "border-emerald-500/40 bg-emerald-500/10" : "border-slate-700/40 bg-elevated opacity-60"}`}
+                                            className={`p-3 rounded-xl border text-center transition ${isCurrent ? "border-orange-400 bg-orange-500/20 scale-105 shadow-lg" : isUnlocked ? "border-emerald-500/40 bg-emerald-500/10" : "border-white/5 bg-elevated opacity-60"}`}
                                         >
                                             <span className="text-[11px] font-bold block text-slate-400">{t("day_label")} {dayNum}</span>
                                             <span className="text-base sm:text-lg font-black block my-1 text-amber-400">+{reward}</span>
@@ -986,36 +1239,43 @@ function App() {
                             </div>
                         </div>
 
+                        {/* ۳. کارت‌های HUD آمار (Bento Grid) */}
                         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                             <div className="bento-card p-5">
                                 <span className="text-xs text-slate-400 font-bold">{t("stat_today_study")}</span>
-                                <p className="text-2xl sm:text-3xl font-black text-accent mt-2">
+                                <p className="text-2xl sm:text-3xl font-black text-accent mt-2 font-display">
                                     {stats.today_study_hours} {t("hours_short")} <span className="text-xs text-slate-400">({stats.today_study_minutes} {t("mins_short")})</span>
                                 </p>
                             </div>
                             <div className="bento-card p-5">
                                 <span className="text-xs text-slate-400 font-bold">{t("stat_verified_pomo")}</span>
-                                <p className="text-2xl sm:text-3xl font-black text-emerald-400 mt-2">
+                                <p className="text-2xl sm:text-3xl font-black text-emerald-400 mt-2 font-display">
                                     {stats.today_pomodoro_count} <span className="text-xs text-slate-400">({stats.today_pomodoro_minutes} {t("mins_short")})</span>
                                 </p>
                             </div>
                             <div className="bento-card p-5">
                                 <span className="text-xs text-slate-400 font-bold">{t("stat_total_hours")}</span>
-                                <p className="text-2xl sm:text-3xl font-black text-amber-400 mt-2">
+                                <p className="text-2xl sm:text-3xl font-black text-amber-400 mt-2 font-display">
                                     {stats.total_study_hours} {t("hours_short")}
                                 </p>
                             </div>
                             <div className="bento-card p-5">
                                 <span className="text-xs text-slate-400 font-bold">{t("stat_global_rank")}</span>
-                                <p className="text-2xl sm:text-3xl font-black text-purple-400 mt-2">#{stats.leaderboard_rank}</p>
+                                <p className="text-2xl sm:text-3xl font-black text-cyan-400 mt-2 font-display">#{stats.leaderboard_rank}</p>
                             </div>
                         </div>
 
                         <StudyHeatmap heatmapData={heatmap} t={t}></StudyHeatmap>
 
+                        {/* ۴. تخته مأموریت‌های درسی (Quest Board) و ثبت سریع */}
                         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                            <div className="lg:col-span-7 bento-card p-6 space-y-4">
-                                <h3 className="text-lg font-black">{t("courses_header")}</h3>
+                            <div className="lg:col-span-7 bento-card rim-light-ai p-6 space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-lg font-black flex items-center gap-2">
+                                        <span>📜</span>
+                                        <span>{t("quest_board_courses")}</span>
+                                    </h3>
+                                </div>
                                 <form
                                     onSubmit={async (e) => {
                                         e.preventDefault();
@@ -1030,6 +1290,7 @@ function App() {
                                                 })
                                             });
                                             e.target.reset();
+                                            spawnParticleBurst(window.innerWidth / 2, window.innerHeight / 2);
                                             refreshAll();
                                         } catch (err) {
                                             notify(err.message, "error");
@@ -1040,7 +1301,7 @@ function App() {
                                     <input name="name" required placeholder={t("course_name_ph")} className="sm:col-span-2 px-3.5 py-2.5 rounded-xl bg-elevated border border-slate-700/50 text-xs" />
                                     <div className="flex gap-2">
                                         <input name="hours" type="number" step="0.5" min="1" max="60" defaultValue="5" required placeholder={t("weekly_hours_ph")} className="w-full px-3 py-2.5 rounded-xl bg-elevated border border-slate-700/50 text-xs" />
-                                        <input name="color" type="color" defaultValue="#6366f1" className="w-10 h-10 rounded-lg bg-transparent cursor-pointer" />
+                                        <input name="color" type="color" defaultValue="#8b5cf6" className="w-10 h-10 rounded-lg bg-transparent cursor-pointer" />
                                     </div>
                                     <button type="submit" className="tactile-btn py-2.5 px-4 rounded-xl text-xs">{t("add_course")}</button>
                                 </form>
@@ -1049,26 +1310,39 @@ function App() {
                                     {courses.length === 0 ? (
                                         <p className="text-xs text-slate-400 col-span-2">{t("no_courses")}</p>
                                     ) : (
-                                        courses.map(c => (
-                                            <div key={c.id} className="p-3.5 rounded-xl bg-elevated border border-slate-700/40 flex items-center justify-between">
-                                                <div className="flex items-center gap-3">
-                                                    <span className="w-3 h-8 rounded-full" style={{ background: c.color }}></span>
-                                                    <div>
-                                                        <h4 className="font-bold text-sm">{c.name}</h4>
-                                                        <span className="text-[11px] text-slate-400">{c.weekly_goal_hours} {t("hours_short")}</span>
+                                        courses.map(c => {
+                                            const diffBadge = c.weekly_goal_hours >= 10
+                                                ? { label: t("diff_legendary"), cls: "badge-legendary" }
+                                                : c.weekly_goal_hours >= 5
+                                                ? { label: t("diff_hard"), cls: "badge-hard" }
+                                                : { label: t("diff_easy"), cls: "badge-easy" };
+                                            const questXp = Math.round(c.weekly_goal_hours * 600);
+
+                                            return (
+                                                <div key={c.id} className="p-4 rounded-xl bg-elevated border border-white/10 hover:border-accent flex items-center justify-between transition">
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="w-2.5 h-10 rounded-full" style={{ background: c.color, boxShadow: `0 0 10px ${c.color}` }}></span>
+                                                        <div>
+                                                            <div className="flex items-center gap-1.5">
+                                                                <span className={`text-[9px] px-2 py-0.5 rounded font-black ${diffBadge.cls}`}>{diffBadge.label}</span>
+                                                                <span className="text-[10px] font-black text-amber-300">+{questXp} XP</span>
+                                                            </div>
+                                                            <h4 className="font-bold text-sm mt-1">{c.name}</h4>
+                                                            <span className="text-[11px] text-slate-400">Target: {c.weekly_goal_hours} {t("hours_short")}/wk</span>
+                                                        </div>
                                                     </div>
+                                                    <button
+                                                        onClick={async () => {
+                                                            await api(`/courses/${c.id}`, { method: "DELETE" });
+                                                            refreshAll();
+                                                        }}
+                                                        className="text-xs text-slate-500 hover:text-red-400 px-2"
+                                                    >
+                                                        ✕
+                                                    </button>
                                                 </div>
-                                                <button
-                                                    onClick={async () => {
-                                                        await api(`/courses/${c.id}`, { method: "DELETE" });
-                                                        refreshAll();
-                                                    }}
-                                                    className="text-xs text-slate-500 hover:text-red-400 px-2"
-                                                >
-                                                    ✕
-                                                </button>
-                                            </div>
-                                        ))
+                                            );
+                                        })
                                     )}
                                 </div>
                             </div>
@@ -1081,7 +1355,7 @@ function App() {
                                         <span className="text-accent">{stats.today_quick_minutes} / 600 {t("mins_short")} ({stats.remaining_quick_minutes} {t("quick_log_remaining")})</span>
                                     </div>
                                     <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
-                                        <div className="h-full bg-indigo-500 transition-all" style={{ width: `${Math.min(100, (stats.today_quick_minutes / 600) * 100)}%` }}></div>
+                                        <div className="h-full bg-violet-500 transition-all" style={{ width: `${Math.min(100, (stats.today_quick_minutes / 600) * 100)}%` }}></div>
                                     </div>
                                 </div>
 
@@ -1099,7 +1373,8 @@ function App() {
                                                 })
                                             });
                                             e.target.reset();
-                                            notify(lang === "fa" ? "در ساعات مطالعه امروز ثبت شد." : "Added to today's study hours.");
+                                            spawnParticleBurst(window.innerWidth / 2, window.innerHeight / 2);
+                                            notify(lang === "fa" ? "مأموریت ثبت شد و XP دریافت کردید!" : "Quest logged & XP gained!");
                                             refreshAll();
                                         } catch (err) {
                                             notify(err.message, "error");
@@ -1124,9 +1399,9 @@ function App() {
                                         <p className="text-xs text-slate-500">{t("no_logs")}</p>
                                     ) : (
                                         sessions.slice(0, 4).map(s => (
-                                            <div key={s.id} className="flex justify-between text-xs p-2 rounded-lg bg-elevated">
+                                            <div key={s.id} className="flex justify-between text-xs p-2.5 rounded-lg bg-elevated border border-white/5">
                                                 <span className="font-bold">{s.course_name}</span>
-                                                <span className="text-slate-400">{s.duration_minutes} {t("mins_short")}</span>
+                                                <span className="text-cyan-400 font-bold">+{s.duration_minutes * 10} XP ({s.duration_minutes}m)</span>
                                             </div>
                                         ))
                                     )}
@@ -1137,7 +1412,7 @@ function App() {
                 )}
 
                 {activeTab === "pomodoro" && (
-                    <div className="bento-card p-6 sm:p-10 max-w-2xl mx-auto text-center space-y-6">
+                    <div className="bento-card rim-light-boss p-6 sm:p-10 max-w-2xl mx-auto text-center space-y-6">
                         <h2 className="text-2xl sm:text-3xl font-black">{t("pomo_header")}</h2>
                         <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-semibold">
                             🛡️ {t("pomo_rule_banner")}
@@ -1154,7 +1429,7 @@ function App() {
                                     }}
                                     className={`px-4 py-2 rounded-xl text-xs font-bold transition ${pomoTargetMins === m ? "tactile-btn" : "bg-elevated border border-slate-700/50"} disabled:opacity-50`}
                                 >
-                                    {m} {t("mins_short")} (+{(m / 25) * 10} 🪙)
+                                    {m} {t("mins_short")} (+{(m / 25) * 10} 🪙 / -{m} Boss HP)
                                 </button>
                             ))}
                         </div>
@@ -1190,12 +1465,12 @@ function App() {
                                                 fill="transparent"
                                                 strokeDasharray={dash}
                                                 strokeDashoffset={offset}
-                                                style={{ transition: "stroke-dashoffset 0.8s linear" }}
+                                                style={{ transition: "stroke-dashoffset 0.8s linear", filter: "drop-shadow(0 0 12px var(--accent-glow))" }}
                                             />
                                         </svg>
                                         <div className="absolute inset-0 flex flex-col items-center justify-center">
                                             <span className="text-5xl font-black font-display tracking-wider">{mm}:{ss}</span>
-                                            <span className="text-xs font-bold text-accent mt-2">{pct}%</span>
+                                            <span className="text-xs font-bold text-accent mt-2">{pct}% CHARGED</span>
                                         </div>
                                     </>
                                 );
@@ -1208,8 +1483,8 @@ function App() {
 
                         <div className="flex justify-center gap-3">
                             {!pomoSessionId ? (
-                                <button onClick={handleStartPomodoro} className="tactile-btn px-8 py-4 rounded-2xl text-sm">
-                                    {t("pomo_start_btn")}
+                                <button onClick={handleStartPomodoro} className="attack-btn px-8 py-4 rounded-2xl text-sm">
+                                    ⚔️ {t("pomo_start_btn")}
                                 </button>
                             ) : (
                                 <>
@@ -1225,10 +1500,11 @@ function App() {
                     </div>
                 )}
 
+                {/* TAB 3: GEMINI AI QUEST BOARD (با بج سختی و انفجار ذرات هنگام تکمیل کوئست) */}
                 {activeTab === "ai" && (
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                         <div className="lg:col-span-4 space-y-5">
-                            <div className="bento-card p-6 space-y-4">
+                            <div className="bento-card rim-light-ai p-6 space-y-4">
                                 <h2 className="text-xl font-black">{t("ai_header")}</h2>
                                 <p className="text-xs text-slate-400">{t("ai_sub")}</p>
 
@@ -1316,13 +1592,14 @@ function App() {
                             {!selectedPlan ? (
                                 <div className="bento-card p-12 text-center text-slate-400 text-sm">{t("ai_select_prompt")}</div>
                             ) : (
-                                <div className="bento-card p-6 space-y-5">
+                                <div className="bento-card rim-light-ai p-6 space-y-5">
                                     <div className="flex flex-wrap justify-between items-center gap-3 border-b border-slate-800 pb-4">
                                         <div>
-                                            <h3 className="text-2xl font-black">{selectedPlan.goal_title}</h3>
+                                            <span className="text-[10px] font-black uppercase tracking-widest text-cyan-400 block">{t("quest_board_title")}</span>
+                                            <h3 className="text-2xl font-black mt-0.5">{selectedPlan.goal_title}</h3>
                                             <span className="text-xs text-slate-400">🎯 {selectedPlan.target_date}</span>
                                         </div>
-                                        <span className="px-3.5 py-1.5 rounded-xl bg-indigo-500/15 text-accent font-black text-xs">
+                                        <span className="px-3.5 py-1.5 rounded-xl metallic-gold-badge text-xs">
                                             {t("ai_progress")}: {selectedPlan.progress_percentage}%
                                         </span>
                                     </div>
@@ -1333,49 +1610,70 @@ function App() {
                                         <p className="italic text-slate-400 pt-1">"{selectedPlan.motivational_quote}"</p>
                                     </div>
 
-                                    <div className="space-y-2.5">
+                                    {/* Quest Log Items */}
+                                    <div className="space-y-3">
                                         {selectedPlan.schedule.map(day => {
                                             const todayStr = getTodayISO();
                                             const isFuture = day.date > todayStr;
                                             const isToday = day.date === todayStr;
                                             const isDone = (selectedPlan.completed_days || []).includes(day.day_number);
 
+                                            const diff = day.pomodoro_blocks >= 6
+                                                ? { label: t("diff_legendary"), cls: "badge-legendary" }
+                                                : day.pomodoro_blocks >= 3
+                                                ? { label: t("diff_hard"), cls: "badge-hard" }
+                                                : { label: t("diff_easy"), cls: "badge-easy" };
+
+                                            const questXp = day.pomodoro_blocks * 250;
+
                                             return (
                                                 <div
                                                     key={day.day_number}
-                                                    onClick={async () => {
+                                                    onClick={async (e) => {
                                                         if (isFuture) {
                                                             notify(`${t("ai_locked_day")} ${day.date} 🔒`, "error");
                                                             return;
                                                         }
                                                         try {
-                                                            await api(`/ai/plans/${selectedPlan.id}/days/${day.day_number}/toggle`, { method: "POST" });
+                                                            const res = await api(`/ai/plans/${selectedPlan.id}/days/${day.day_number}/toggle`, { method: "POST" });
+                                                            if (res.is_completed) {
+                                                                playSynthChime();
+                                                                spawnParticleBurst(e.clientX, e.clientY);
+                                                            }
                                                             const updated = await api(`/ai/plans/${selectedPlan.id}`);
                                                             setSelectedPlan(updated);
                                                         } catch (err) {
                                                             notify(err.message, "error");
                                                         }
                                                     }}
-                                                    className={`p-4 rounded-xl border transition flex items-center justify-between gap-4 ${isFuture ? "opacity-55 cursor-not-allowed bg-elevated border-slate-800" : isDone ? "bg-emerald-500/10 border-emerald-500/40 cursor-pointer" : "bg-elevated border-slate-700/60 hover:border-accent cursor-pointer"}`}
+                                                    className={`p-4 rounded-2xl border transition flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${isFuture ? "opacity-50 cursor-not-allowed bg-elevated border-slate-800" : isDone ? "bg-emerald-500/10 border-emerald-500/40 cursor-pointer" : "bg-elevated border-white/10 hover:border-accent cursor-pointer"}`}
                                                 >
-                                                    <div className="flex items-center gap-3.5">
-                                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ${isFuture ? "bg-slate-800 text-slate-400" : isDone ? "bg-emerald-500 text-white" : "border-2 border-slate-500"}`}>
-                                                            {isFuture ? "🔒" : isDone ? "✓" : ""}
+                                                    <div className="flex items-start sm:items-center gap-3.5">
+                                                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-black shrink-0 ${isFuture ? "bg-slate-800 text-slate-400" : isDone ? "bg-emerald-500 text-white shadow-[0_0_12px_rgba(16,185,129,0.7)]" : "border-2 border-slate-500"}`}>
+                                                            {isFuture ? "🔒" : isDone ? "✓" : "⚔️"}
                                                         </div>
                                                         <div>
-                                                            <div className="flex items-center gap-2">
+                                                            <div className="flex flex-wrap items-center gap-2">
+                                                                <span className={`text-[10px] px-2 py-0.5 rounded font-black ${diff.cls}`}>{diff.label}</span>
                                                                 <span className="text-xs font-black">{t("day_label")} {day.day_number} ({day.date})</span>
                                                                 {isToday && <span className="text-[10px] px-2 py-0.5 rounded bg-accent text-white font-bold">{t("ai_today_badge")}</span>}
                                                                 {isFuture && <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400">{t("ai_locked_day")} {day.date}</span>}
                                                             </div>
-                                                            <p className={`text-xs mt-1 ${isDone ? "line-through text-slate-400" : ""}`}>
+                                                            <p className={`text-xs mt-1.5 leading-relaxed ${isDone ? "line-through text-slate-400" : ""}`}>
                                                                 <strong className="text-accent">{day.focus_topic}:</strong> {day.action_item}
                                                             </p>
                                                         </div>
                                                     </div>
-                                                    <span className="text-xs font-bold shrink-0 text-slate-400">
-                                                        {day.pomodoro_blocks} {t("pomo_blocks_unit")}
-                                                    </span>
+
+                                                    {/* پاداش درخشان مأموریت */}
+                                                    <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                                                        <span className="px-2.5 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-[11px] font-black">
+                                                            +{questXp} XP
+                                                        </span>
+                                                        <span className="px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[11px] font-black">
+                                                            +{day.potential_coins} 🪙
+                                                        </span>
+                                                    </div>
                                                 </div>
                                             );
                                         })}
@@ -1393,7 +1691,7 @@ function App() {
                                 <h2 className="text-2xl font-black">{t("shop_header")}</h2>
                                 <p className="text-xs text-slate-400 mt-1">{t("shop_sub")}</p>
                             </div>
-                            <div className="px-5 py-3 rounded-2xl bg-amber-500/15 border border-amber-500/40 text-amber-300 font-black text-lg">
+                            <div className="px-5 py-3 rounded-2xl metallic-gold-badge text-lg">
                                 {stats?.coins || 0} 🪙
                             </div>
                         </div>
@@ -1409,7 +1707,7 @@ function App() {
                                                 </span>
                                                 <h3 className="text-xl font-black mt-1">{lang === "fa" ? th.name_fa : th.name}</h3>
                                             </div>
-                                            <span className="px-3 py-1 rounded-xl bg-black/45 backdrop-blur-md text-xs font-black text-amber-300">
+                                            <span className="px-3 py-1 rounded-xl bg-black/55 backdrop-blur-md text-xs font-black text-amber-300">
                                                 {th.price === 0 ? t("shop_free") : `${th.price} 🪙`}
                                             </span>
                                         </div>
@@ -1436,17 +1734,18 @@ function App() {
                                             </button>
                                         ) : (
                                             <button
-                                                onClick={async () => {
+                                                onClick={async (e) => {
                                                     try {
                                                         await api("/shop/buy", { method: "POST", body: JSON.stringify({ theme_id: th.id }) });
                                                         await api("/shop/equip", { method: "POST", body: JSON.stringify({ theme_id: th.id }) });
                                                         playSynthChime();
+                                                        spawnParticleBurst(e.clientX, e.clientY);
                                                         refreshAll();
                                                     } catch (err) {
                                                         notify(err.message, "error");
                                                     }
                                                 }}
-                                                className="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition"
+                                                className="w-full py-3 rounded-xl metallic-gold-badge text-xs transition hover:brightness-110"
                                             >
                                                 {t("shop_buy")} {th.price} 🪙
                                             </button>
@@ -1494,23 +1793,23 @@ function App() {
                                             className={`p-4 rounded-2xl text-white flex items-center justify-between cursor-pointer transform hover:scale-[1.01] transition aura-${u.active_theme || 'default'}`}
                                         >
                                             <div className="flex items-center gap-3.5">
-                                                <span className="text-xl font-black w-7">#{u.rank}</span>
+                                                <span className="text-xl font-black font-display w-7">#{u.rank}</span>
                                                 <div>
                                                     <div className="flex flex-wrap items-center gap-2">
                                                         <span className="font-extrabold text-sm underline decoration-white/40">{u.username}</span>
-                                                        <span className="px-2 py-0.5 rounded bg-black/45 text-[10px] font-black text-amber-300">
+                                                        <span className="px-2 py-0.5 rounded metallic-gold-badge text-[10px]">
                                                             LVL {u.level || 1}
                                                         </span>
-                                                        <span className="text-[11px] font-bold text-slate-200">
-                                                            • {lang === "fa" ? u.title_fa : u.title}
+                                                        <span className="px-2 py-0.5 rounded metallic-platinum-badge text-[10px]">
+                                                            {lang === "fa" ? u.title_fa : u.title}
                                                         </span>
                                                     </div>
-                                                    <span className="text-[11px] opacity-85 block mt-0.5">
+                                                    <span className="text-[11px] opacity-85 block mt-1">
                                                         ⏱️ {u.total_study_hours} {t("hours_short")} ({u.total_study_minutes} {t("mins_short")})
                                                     </span>
                                                 </div>
                                             </div>
-                                            <span className="px-3 py-1 rounded-xl bg-black/40 text-xs font-black text-amber-300">
+                                            <span className="px-3 py-1 rounded-xl bg-black/50 border border-white/15 text-xs font-black text-amber-300">
                                                 {u.total_coins_earned} 🪙
                                             </span>
                                         </div>
@@ -1588,7 +1887,7 @@ function App() {
                                             </button>
                                         </div>
 
-                                        <div className="p-4 rounded-2xl bg-gradient-to-br from-red-950/50 via-slate-900 to-slate-950 border border-red-500/30 space-y-3">
+                                        <div className="p-4 rounded-2xl rim-light-boss bg-gradient-to-br from-red-950/50 via-zinc-950 to-zinc-950 space-y-3">
                                             <div className="flex items-center justify-between">
                                                 <span className="text-xs font-black text-red-400 flex items-center gap-1.5">
                                                     <span>🐉</span>
@@ -1600,7 +1899,7 @@ function App() {
                                                 <div className="space-y-2.5">
                                                     <div className="flex justify-between items-center">
                                                         <span className="font-extrabold text-sm text-white">{latestRaid.boss_name}</span>
-                                                        <span className="text-xs font-black px-2.5 py-0.5 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                                        <span className="text-xs px-2.5 py-0.5 rounded-lg metallic-gold-badge">
                                                             🔒 +{latestRaid.reward_coins} 🪙
                                                         </span>
                                                     </div>
@@ -1615,9 +1914,9 @@ function App() {
                                                                 <span>BOSS HP</span>
                                                                 <span>{latestRaid.current_hp} / {latestRaid.max_hp} HP</span>
                                                             </div>
-                                                            <div className="w-full h-3 bg-black/60 rounded-full overflow-hidden border border-red-500/30">
+                                                            <div className="w-full h-3 bg-black/70 rounded-full overflow-hidden border border-red-500/40">
                                                                 <div
-                                                                    className="h-full bg-gradient-to-r from-red-600 to-orange-500 transition-all duration-500"
+                                                                    className="h-full bg-gradient-to-r from-red-600 via-orange-500 to-amber-400 transition-all duration-500"
                                                                     style={{ width: `${Math.max(0, Math.min(100, (latestRaid.current_hp / latestRaid.max_hp) * 100))}%` }}
                                                                 ></div>
                                                             </div>
@@ -1666,7 +1965,7 @@ function App() {
                                                 >
                                                     <div className="flex flex-wrap items-center gap-1.5">
                                                         <span className="font-extrabold underline decoration-white/40">{i + 1}. {m.username} {m.is_owner ? "👑" : ""}</span>
-                                                        <span className="px-1.5 py-0.5 rounded bg-black/45 text-[9px] font-black text-amber-300">
+                                                        <span className="px-1.5 py-0.5 rounded metallic-gold-badge text-[9px]">
                                                             LVL {m.level || 1}
                                                         </span>
                                                         <span className="text-[10px] opacity-90">
