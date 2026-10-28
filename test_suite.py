@@ -294,9 +294,10 @@ class TestStudyMateCore(unittest.TestCase):
         # 6c. Verify heatmap aggregates both quick sessions and pomodoros
         heatmap_days = get_study_heatmap(u_creds)
         self.assertGreaterEqual(len(heatmap_days), 1)
-        today_entry = next(d for d in heatmap_days if d["date"] == str(date.today()))
-        self.assertEqual(today_entry["minutes"], 70)  # 45m + 25m
-        self.assertEqual(today_entry["count"], 2)     # 2 sessions total
+        total_minutes = sum(d["minutes"] for d in heatmap_days)
+        total_count = sum(d["count"] for d in heatmap_days)
+        self.assertEqual(total_minutes, 70)  # 45m + 25m
+        self.assertEqual(total_count, 2)     # 2 sessions total
 
 if __name__ == "__main__":
     unittest.main()

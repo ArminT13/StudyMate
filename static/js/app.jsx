@@ -871,7 +871,7 @@ function App() {
         document.documentElement.dir = lang === "fa" ? "rtl" : "ltr";
     }, [lang]);
 
-    // API Helper with dynamic base URL support (for decoupled hosting like Netlify + Render/VPS)
+    // API Helper with dynamic base URL support
     const api = async (endpoint, options = {}) => {
         const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
         if (token) headers["Authorization"] = `Bearer ${token}`;
