@@ -1,5 +1,6 @@
 import sqlite3
 import os
+from datetime import datetime, timedelta
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "studymate.db")
 
@@ -27,20 +28,63 @@ def init_db():
                 active_theme TEXT DEFAULT 'default',
                 current_streak INTEGER DEFAULT 0,
                 last_study_date DATE,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                character_name TEXT DEFAULT 'Minti',
+                date_of_birth DATE,
+                referral_code TEXT UNIQUE,
+                referred_by INTEGER,
+                premium_until TIMESTAMP,
+                reset_token TEXT,
+                reset_token_expires TIMESTAMP,
+                equipped_hat TEXT DEFAULT NULL,
+                equipped_glasses TEXT DEFAULT NULL,
+                equipped_outfit TEXT DEFAULT 'classic',
+                equipped_accessory TEXT DEFAULT 'sprout',
+                equipped_jewelry TEXT DEFAULT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (referred_by) REFERENCES users(id) ON DELETE SET NULL
             );
         """)
 
-        # اضافه کردن ستون‌های استریک به دیتابیس موجود بدون کرش کردن
-        try:
-            cursor.execute("ALTER TABLE users ADD COLUMN current_streak INTEGER DEFAULT 0;")
-        except sqlite3.OperationalError:
-            pass
+        # اضافه کردن ستون‌های ارتقا یافته به دیتابیس موجود بدون کرش کردن
+        migration_columns = [
+            ("current_streak", "INTEGER DEFAULT 0"),
+            ("last_study_date", "DATE"),
+            ("character_name", "TEXT DEFAULT 'Minti'"),
+            ("date_of_birth", "DATE"),
+            ("referral_code", "TEXT"),
+            ("referred_by", "INTEGER"),
+            ("premium_until", "TIMESTAMP"),
+            ("reset_token", "TEXT"),
+            ("reset_token_expires", "TIMESTAMP"),
+            ("equipped_hat", "TEXT DEFAULT NULL"),
+            ("equipped_glasses", "TEXT DEFAULT NULL"),
+            ("equipped_outfit", "TEXT DEFAULT 'classic'"),
+            ("equipped_accessory", "TEXT DEFAULT 'sprout'"),
+            ("equipped_jewelry", "TEXT DEFAULT NULL")
+        ]
 
-        try:
-            cursor.execute("ALTER TABLE users ADD COLUMN last_study_date DATE;")
-        except sqlite3.OperationalError:
-            pass
+        for col_name, col_def in migration_columns:
+            try:
+                cursor.execute(f"ALTER TABLE users ADD COLUMN {col_name} {col_def};")
+            except sqlite3.OperationalError:
+                pass
+
+        # اطمینان از مقداردهی کد معرف و نام کاراکتر برای کاربران موجود
+        cursor.execute("SELECT id, username, referral_code, character_name FROM users;")
+        existing_users = cursor.fetchall()
+        for u in existing_users:
+            needs_update = False
+            ref_code = u["referral_code"]
+            c_name = u["character_name"] or "Minti"
+            if not ref_code:
+                clean_name = "".join(c for c in u["username"] if c.isalnum()).upper()[:4] or "USER"
+                ref_code = f"SM-{clean_name}-{u['id']:04d}"
+                needs_update = True
+            if needs_update:
+                cursor.execute(
+                    "UPDATE users SET referral_code = ?, character_name = ? WHERE id = ?",
+                    (ref_code, c_name, u["id"])
+                )
 
         # 2. Courses Table
         cursor.execute("""
@@ -48,7 +92,7 @@ def init_db():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL,
                 name TEXT NOT NULL,
-                color TEXT DEFAULT '#6366f1',
+                color TEXT DEFAULT '#F5AFAF',
                 weekly_goal_hours REAL DEFAULT 5.0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -86,6 +130,27 @@ def init_db():
         cursor.execute("""
             INSERT OR IGNORE INTO user_themes (user_id, theme_id)
             SELECT id, 'default' FROM users;
+        """)
+
+        # 4.1. User Accessories Inventory (کمد لباس و اکسسوری Minti)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS user_accessories (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                item_id TEXT NOT NULL,
+                purchased_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(user_id, item_id),
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+        """)
+
+        cursor.execute("""
+            INSERT OR IGNORE INTO user_accessories (user_id, item_id)
+            SELECT id, 'classic' FROM users;
+        """)
+        cursor.execute("""
+            INSERT OR IGNORE INTO user_accessories (user_id, item_id)
+            SELECT id, 'sprout' FROM users;
         """)
 
         # 5. Study Groups Table
@@ -184,5 +249,80 @@ def init_db():
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             );
         """)
+
+        # 11. Friend Requests & Friendships Table (سیستم دوستان)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS friend_requests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                sender_id INTEGER NOT NULL,
+                receiver_id INTEGER NOT NULL,
+                status TEXT DEFAULT 'pending', -- 'pending', 'accepted', 'rejected'
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(sender_id, receiver_id),
+                FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (receiver_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+        """)
+
+        # 12. Global Weekly Boss Challenge Table (چالش هفتگی: شکست باس سایبری)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS weekly_challenges (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                week_identifier TEXT UNIQUE NOT NULL,
+                boss_name TEXT NOT NULL,
+                boss_name_fa TEXT NOT NULL,
+                description_fa TEXT,
+                max_hp INTEGER NOT NULL,
+                current_hp INTEGER NOT NULL,
+                reward_coins INTEGER DEFAULT 300,
+                reward_xp INTEGER DEFAULT 1000,
+                status TEXT DEFAULT 'active', -- 'active', 'defeated'
+                ends_at TIMESTAMP NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS weekly_challenge_contributions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                challenge_id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
+                damage_dealt INTEGER DEFAULT 0,
+                UNIQUE(challenge_id, user_id),
+                FOREIGN KEY (challenge_id) REFERENCES weekly_challenges(id) ON DELETE CASCADE,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+        """)
+
+        # ایجاد خودکار چالش هفتگی باس سایبری در صورت عدم وجود
+        now = datetime.utcnow()
+        current_iso_year, current_iso_week, _ = now.isocalendar()
+        current_week_key = f"{current_iso_year}-W{current_iso_week:02d}"
+
+        # پایان هفته جاری (یکشنبه ۲۳:۵۹:۵۹)
+        days_until_sunday = 6 - now.weekday()
+        if days_until_sunday < 0:
+            days_until_sunday += 7
+        week_end = (now + timedelta(days=days_until_sunday)).replace(hour=23, minute=59, second=59, microsecond=0)
+
+        cursor.execute("SELECT id FROM weekly_challenges WHERE week_identifier = ?", (current_week_key,))
+        existing_challenge = cursor.fetchone()
+        if not existing_challenge:
+            cursor.execute("""
+                INSERT INTO weekly_challenges 
+                (week_identifier, boss_name, boss_name_fa, description_fa, max_hp, current_hp, reward_coins, reward_xp, status, ends_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)
+            """, (
+                current_week_key,
+                "Cyber Boss",
+                "باس سایبری",
+                "با ۲۰ ساعت مطالعه تیمی در طول هفته، باس سایبری را شکست دهید و ۳۰۰ سکه + ۱۰۰۰ اکس‌پی جایزه بگیرید!",
+                5000,
+                2750, # 55% باقی‌مانده (مشابه تصویر ارجاع که ۴۵٪ دمیج داده شده)
+                300,
+                1000,
+                week_end.isoformat()
+            ))
 
         conn.commit()

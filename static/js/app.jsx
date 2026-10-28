@@ -1,676 +1,868 @@
-﻿class AmbientSynthEngine {
-    constructor() {
-        this.ctx = null;
-        this.activeNodes = [];
-        this.gainNode = null;
-    }
-    init() {
-        if (!this.ctx) {
-            this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-            this.gainNode = this.ctx.createGain();
-            this.gainNode.gain.value = 0.35;
-            this.gainNode.connect(this.ctx.destination);
-        }
-        if (this.ctx.state === "suspended") {
-            this.ctx.resume();
-        }
-    }
-    stop() {
-        this.activeNodes.forEach(n => {
-            try { n.stop(); } catch (e) {}
-            try { n.disconnect(); } catch (e) {}
-        });
-        this.activeNodes = [];
-    }
-    setVolume(vol) {
-        if (this.gainNode) this.gainNode.gain.value = vol;
-    }
-    play(type) {
-        this.init();
-        this.stop();
-        if (type === "none") return;
-
-        if (type === "rain" || type === "whitenoise") {
-            const bufferSize = this.ctx.sampleRate * 2;
-            const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-            const data = buffer.getChannelData(0);
-            let lastOut = 0.0;
-            for (let i = 0; i < bufferSize; i++) {
-                const white = Math.random() * 2 - 1;
-                data[i] = type === "rain"
-                    ? (lastOut = (lastOut + 0.02 * white) / 1.02) * 3.5
-                    : white * 0.15;
-            }
-            const noise = this.ctx.createBufferSource();
-            noise.buffer = buffer;
-            noise.loop = true;
-            noise.connect(this.gainNode);
-            noise.start();
-            this.activeNodes.push(noise);
-        } else if (type === "lofidrone") {
-            [130.81, 196.00, 246.94, 329.63].forEach(freq => {
-                const osc = this.ctx.createOscillator();
-                osc.type = "sine";
-                osc.frequency.value = freq;
-                const filter = this.ctx.createBiquadFilter();
-                filter.type = "lowpass";
-                filter.frequency.value = 400;
-                osc.connect(filter);
-                filter.connect(this.gainNode);
-                osc.start();
-                this.activeNodes.push(osc);
-            });
-        }
-    }
-}
-const ambientEngine = new AmbientSynthEngine();
+// StudyMate OS - Client Application with 3D Minti Companion
+// React 18 + Three.js + Tailwind CSS
 
 const { useState, useEffect, useRef } = React;
 
-const EXTRA_I18N = {
-    fa: {
-        ambient_player_title: "سیستم صوتی محیطی (Lo-Fi & Synth)",
-        sound_none: "خاموش 🔇",
-        sound_rain: "باران 🌧️",
-        sound_whitenoise: "وایت‌نویز 📻",
-        sound_lofidrone: "سینت کیهانی 🌌",
-        quiz_modal_title: "چالش اثبات مطالعه Gemini 🧠",
-        quiz_modal_sub: "پاسخ صحیح به هر سوال = +۵ سکه طلایی و شارژ کریتیکال!",
-        quiz_claim_btn: "ثبت پاسخ و دریافت پاداش ✨",
-        quiz_skip_btn: "بستن",
-        heatmap_title: "ماتریس حرارتی استمرار مطالعه (۱۲۰ روز اخیر)",
-        heatmap_sub: "ردپای تمرکز روزانه شما در شبکه نئونی",
-        hero_boss_badge: "⚔️ نبرد زنده با غول (LIVE BOSS ENCOUNTER)",
-        hero_sim_boss_name: "آرش‌لیچ امتحانات پایان‌ترم و کنکور",
-        hero_attack_cta: "⚔️ حمله با تایمر فوکوس (شروع پومودورو)",
-        hero_test_strike: "💥 ضربه آزمایشی (-25 HP)",
-        hero_boss_hint: "هر ۱ دقیقه فوکوس در پومودورو یا تکمیل مأموریت‌های روزانه از خون این غول کم می‌کند!",
-        quest_board_title: "تخته مأموریت‌های روزانه (Quest Log)",
-        quest_board_courses: "مأموریت‌های درسی فعال (Active Quests)",
-        diff_easy: "EASY",
-        diff_hard: "HARD",
-        diff_legendary: "LEGENDARY",
-        raid_title: "نبرد با غول گروهی (Guild Boss Raid)",
-        raid_sub: "هر ۱ دقیقه پومودوروی اعضا = ۱ ضربه (Damage) به جان باس!",
-        raid_step1_label: "۱. نام درس یا هدف (برای ساخت نام غول توسط Gemini):",
-        raid_course_ph: "مثلاً: ساختمان داده، هوش مصنوعی، ریاضی ۱...",
-        raid_ai_suggest_btn: "پیشنهاد نام غول با Gemini ✨",
-        raid_ai_loading: "در حال خلق نام...",
-        raid_boss_name_ph: "نام غول (یا با دکمه بالا توسط هوش مصنوعی بسازید)",
-        raid_step2_label: "۲. تعیین مقدار جان غول (Boss HP - هر ۱ دقیقه پومودورو = ۱ اچ‌پی):",
-        raid_hp_Convert_rule: "قانون ثابت پاداش: به ازای هر ۲۵ اچ‌پی، دقیقاً ۱۰ سکه به اعضا پاداش داده می‌شود.",
-        raid_locked_bounty: "پاداش قفل‌شده این باس:",
-        raid_create_btn: "احضار غول نبرد ⚔️",
-        raid_defeated: "شکست خورد! پاداش به اعضا واریز شد 🏆",
-        raid_top_dmg: "قهرمانان ضربه‌زننده (کلیک برای مشاهده کارت RPG):",
-        squad_members: "اعضای کلن (کلیک روی هر نفر برای دیدن کارت کاراکتر)",
-        click_profile_hint: "برای مشاهده کارت هولوگرافیک ۳ بعدی روی نام کاربران کلیک کنید 👤",
-        profile_pomos: "پومودوروهای موفق",
-        profile_raid_dmg: "کل دمیج به باس‌ها",
-        profile_member_since: "تاریخ ورود به سیستم",
-        close_btn: "بستن"
-    },
-    en: {
-        ambient_player_title: "Focus Ambient Synth",
-        sound_none: "Muted 🔇",
-        sound_rain: "Rain 🌧️",
-        sound_whitenoise: "White Noise 📻",
-        sound_lofidrone: "Cosmic Lo-Fi 🌌",
-        quiz_modal_title: "Gemini Proof-of-Study Trial 🧠",
-        quiz_modal_sub: "Each correct answer grants +5 Bonus Gold & Critical XP!",
-        quiz_claim_btn: "Submit & Claim Bounty ✨",
-        quiz_skip_btn: "Close",
-        heatmap_title: "120-Day Focus Continuum Matrix",
-        heatmap_sub: "Your daily study intensity tracked on the cyber grid",
-        hero_boss_badge: "⚔️ LIVE BOSS ENCOUNTER",
-        hero_sim_boss_name: "Arch-Lich of Final Exams & Deadlines",
-        hero_attack_cta: "⚔️ Attack: Engage Focus Timer",
-        hero_test_strike: "💥 Test Strike (-25 HP)",
-        hero_boss_hint: "Every 1 minute of Pomodoro focus or completed Quest deals direct damage to the Boss HP!",
-        quest_board_title: "Daily Quest Board",
-        quest_board_courses: "Active Course Quests",
-        diff_easy: "EASY",
-        diff_hard: "HARD",
-        diff_legendary: "LEGENDARY",
-        raid_title: "Guild Boss Raid",
-        raid_sub: "Every 1 minute of completed Pomodoro deals 1 Damage to the Boss!",
-        raid_step1_label: "1. Enter Course or Goal (for Gemini AI Boss Naming):",
-        raid_course_ph: "e.g. Data Structures, Artificial Intelligence, Calculus...",
-        raid_ai_suggest_btn: "Generate Boss Name with Gemini ✨",
-        raid_ai_loading: "Summoning Names...",
-        raid_boss_name_ph: "Boss Title (or click AI Generate above)",
-        raid_step2_label: "2. Enter Boss HP (Every 1 min of Pomodoro = 1 HP Damage):",
-        raid_hp_Convert_rule: "Fixed Bounty Formula: Every 25 HP automatically grants 10 Coins (Non-editable).",
-        raid_locked_bounty: "Locked Boss Bounty:",
-        raid_create_btn: "Summon Raid Boss ⚔️",
-        raid_defeated: "Defeated! Bounty awarded to contributors 🏆",
-        raid_top_dmg: "Top Damage Dealers (Click to inspect RPG Card):",
-        squad_members: "Guild Operatives (Click any member to inspect RPG Card)",
-        click_profile_hint: "Click on any operative's name to inspect their 3D Holographic Character Card 👤",
-        profile_pomos: "Verified Pomodoros",
-        profile_raid_dmg: "Total Boss Damage",
-        profile_member_since: "Operative Since",
-        close_btn: "Close"
-    }
-};
+// ----------------- 3D MINTI COMPANION COMPONENT (THREE.JS) -----------------
 
-function playSynthChime() {
-    try {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        [523.25, 659.25, 783.99, 1046.5].forEach((freq, i) => {
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.type = "triangle";
-            osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.11);
-            gain.gain.setValueAtTime(0.18, ctx.currentTime + i * 0.11);
-            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.11 + 0.35);
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.start(ctx.currentTime + i * 0.11);
-            osc.stop(ctx.currentTime + i * 0.11 + 0.35);
-        });
-    } catch (e) {}
-}
+function MintiCharacter3D({
+    state = "idle", // idle, welcome, study, completed, levelup, streak, boss_defeat, sleep
+    equippedHat = null,
+    equippedGlasses = null,
+    equippedOutfit = "classic",
+    equippedAccessory = "sprout",
+    equippedJewelry = null,
+    interactive = true,
+    size = "md", // sm (160px), md (240px), lg (340px)
+    characterName = "Minti",
+    onCharacterClick = null
+}) {
+    const mountRef = useRef(null);
+    const sceneRef = useRef(null);
+    const rendererRef = useRef(null);
+    const characterRef = useRef(null);
+    const animFrameRef = useRef(null);
+    const [speechText, setSpeechText] = useState(null);
+    const speechTimeoutRef = useRef(null);
+    const rotationYRef = useRef(0);
+    const isDraggingRef = useRef(false);
+    const startXRef = useRef(0);
+    const dragDistanceRef = useRef(0);
 
-function playSwordSlashSound() {
-    try {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = "sawtooth";
-        osc.frequency.setValueAtTime(280, ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(55, ctx.currentTime + 0.22);
-        gain.gain.setValueAtTime(0.25, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.24);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start();
-        osc.stop(ctx.currentTime + 0.24);
-    } catch (e) {}
-}
-
-/* افکت انفجار ذرات هنگام تیک زدن کوئست یا ضربه به باس */
-function spawnParticleBurst(clientX, clientY, colors = ["#facc15", "#a855f7", "#06b6d4", "#ef4444", "#10b981"]) {
-    const x = clientX || window.innerWidth / 2;
-    const y = clientY || window.innerHeight / 2;
-    for (let i = 0; i < 20; i++) {
-        const p = document.createElement("div");
-        p.className = "quest-particle";
-        const angle = Math.random() * Math.PI * 2;
-        const dist = 35 + Math.random() * 85;
-        p.style.left = `${x}px`;
-        p.style.top = `${y}px`;
-        p.style.backgroundColor = colors[i % colors.length];
-        p.style.boxShadow = `0 0 10px ${colors[i % colors.length]}`;
-        p.style.setProperty("--tx", `${Math.cos(angle) * dist}px`);
-        p.style.setProperty("--ty", `${Math.sin(angle) * dist}px`);
-        document.body.appendChild(p);
-        setTimeout(() => p.remove(), 750);
-    }
-}
-
-function getTomorrowISO() {
-    const d = new Date();
-    d.setDate(d.getDate() + 1);
-    return d.toISOString().split("T")[0];
-}
-
-function getTodayISO() {
-    return new Date().toISOString().split("T")[0];
-}
-
-/* ۱. کامپوننت ذرات نوری معلق پس‌زمینه (Ambient Floating Embers) */
-function AmbientEmbers() {
-    const embers = [
-        { left: "8%", top: "85%", size: 4, color: "#8b5cf6", dur: "11s", delay: "0s" },
-        { left: "22%", top: "90%", size: 3, color: "#06b6d4", dur: "14s", delay: "2s" },
-        { left: "38%", top: "80%", size: 5, color: "#f59e0b", dur: "9s", delay: "1s" },
-        { left: "55%", top: "92%", size: 3, color: "#ec4899", dur: "13s", delay: "3s" },
-        { left: "72%", top: "88%", size: 4, color: "#10b981", dur: "12s", delay: "0.5s" },
-        { left: "88%", top: "82%", size: 5, color: "#ef4444", dur: "10s", delay: "2.5s" }
+    const phrases = [
+        "متشکرم! عالی کار کردی! ✨",
+        "بیا ادامه بدیم! تو می‌تونی! 💪",
+        "امروز هم عالی بودی! 🌟",
+        "هر قدم کوچیک، یه معجزه می‌سازه! 🌱",
+        "همیشه کنارت هستم! 💖",
+        "با تمرکز، غیرممکن‌ها ممکن می‌شن! 🚀",
+        "استایل جدیدم چطوره؟ خیلی قشنگه! 🎀"
     ];
-    return (
-        <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-            {embers.map((em, i) => (
-                <span
-                    key={i}
-                    className="ambient-ember"
-                    style={{
-                        left: em.left,
-                        top: em.top,
-                        width: `${em.size}px`,
-                        height: `${em.size}px`,
-                        backgroundColor: em.color,
-                        boxShadow: `0 0 12px ${em.color}`,
-                        animationDuration: em.dur,
-                        animationDelay: em.delay
-                    }}
-                ></span>
-            ))}
-        </div>
-    );
-}
 
-/* ۲. کارت پروفایل هولوگرافیک ۳ بعدی با افکت Tilt on Hover و بج متالیک */
-function HolographicRPGCard(props) {
-    const { stats, activeThemeObj, lang, t, onClick } = props;
-    const cardRef = useRef(null);
-    const [tiltStyle, setTiltStyle] = useState({});
+    const triggerClickReaction = () => {
+        const randomPhrase = phrases[Math.floor(Math.random() * phrases.length)];
+        setSpeechText(randomPhrase);
+        if (speechTimeoutRef.current) clearTimeout(speechTimeoutRef.current);
+        speechTimeoutRef.current = setTimeout(() => setSpeechText(null), 3800);
 
-    const handleMouseMove = (e) => {
-        if (!cardRef.current) return;
-        const rect = cardRef.current.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-        const rotateY = ((x / rect.width) - 0.5) * 18;
-        const rotateX = ((0.5 - (y / rect.height)) * 18);
-        setTiltStyle({
-            transform: `perspective(900px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(1.02)`,
-            transition: "transform 0.08s ease-out"
-        });
+        if (characterRef.current) {
+            characterRef.current.userData.wobble = 1.0;
+        }
+        if (onCharacterClick) onCharacterClick();
     };
 
-    const handleMouseLeave = () => {
-        setTiltStyle({
-            transform: "perspective(900px) rotateX(0deg) rotateY(0deg) scale(1)",
-            transition: "transform 0.4s ease-out"
-        });
-    };
+    useEffect(() => {
+        const container = mountRef.current;
+        if (!container || typeof THREE === "undefined") return;
 
-    const xpPct = Math.min(100, Math.round(((stats.xp || 0) / (stats.next_level_xp || 150)) * 100));
+        const width = container.clientWidth || (size === "lg" ? 340 : size === "sm" ? 160 : 240);
+        const height = container.clientHeight || (size === "lg" ? 340 : size === "sm" ? 160 : 240);
+
+        // 1. Scene & Camera
+        const scene = new THREE.Scene();
+        sceneRef.current = scene;
+
+        const camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 100);
+        camera.position.set(0, 0.25, 3.8);
+
+        // 2. Renderer with ACES Tone Mapping (avoids blown-out white surfaces)
+        const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+        renderer.setSize(width, height);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.05;
+        rendererRef.current = renderer;
+        container.innerHTML = "";
+        container.appendChild(renderer.domElement);
+
+        // 3. Balanced Lighting Setup for Soft Pastel Shading
+        const ambientLight = new THREE.AmbientLight(0xfff1f1, 0.78);
+        scene.add(ambientLight);
+
+        const keyLight = new THREE.DirectionalLight(0xffffff, 0.85);
+        keyLight.position.set(2.0, 3.5, 3.0);
+        keyLight.castShadow = true;
+        scene.add(keyLight);
+
+        const fillLight = new THREE.DirectionalLight(0xffe4e6, 0.35);
+        fillLight.position.set(-2.0, 1.5, 2.0);
+        scene.add(fillLight);
+
+        const rimLight = new THREE.DirectionalLight(0xf5afaf, 0.55);
+        rimLight.position.set(0, 2.5, -2.5);
+        scene.add(rimLight);
+
+        // 4. Materials with warm peach-cream porcelain tone
+        const bodyMat = new THREE.MeshStandardMaterial({
+            color: 0xffeae8, // Warm peach-cream tone matching reference image
+            roughness: 0.52,
+            metalness: 0.02
+        });
+
+        const bellyMat = new THREE.MeshStandardMaterial({
+            color: 0xfff7f5, // Slightly lighter warm belly
+            roughness: 0.55,
+            metalness: 0.01
+        });
+
+        const pinkBlushMat = new THREE.MeshStandardMaterial({
+            color: 0xf43f5e,
+            roughness: 0.6,
+            transparent: true,
+            opacity: 0.45
+        });
+
+        const earInnerMat = new THREE.MeshStandardMaterial({
+            color: 0xfda4af, // Soft pastel rose inner ear
+            roughness: 0.65
+        });
+
+        const eyeMat = new THREE.MeshStandardMaterial({
+            color: 0x180f1a, // Deep rich obsidian blackberry
+            roughness: 0.08,
+            metalness: 0.4
+        });
+
+        const specularMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+
+        const mouthMat = new THREE.MeshBasicMaterial({ color: 0x9f1239 });
+        const tongueMat = new THREE.MeshBasicMaterial({ color: 0xf472b6 });
+
+        const greenSproutMat = new THREE.MeshStandardMaterial({
+            color: 0x22c55e, // Vibrant emerald green
+            roughness: 0.35
+        });
+
+        const flowerBudMat = new THREE.MeshStandardMaterial({
+            color: 0xf472b6, // Cute pink flower bud
+            roughness: 0.3
+        });
+
+        const goldCrownMat = new THREE.MeshStandardMaterial({
+            color: 0xfacc15,
+            roughness: 0.2,
+            metalness: 0.85
+        });
+
+        const silverMat = new THREE.MeshStandardMaterial({
+            color: 0xe2e8f0,
+            roughness: 0.15,
+            metalness: 0.9
+        });
+
+        const backpackMat = new THREE.MeshStandardMaterial({
+            color: 0x0ea5e9, // Bright sky blue bag
+            roughness: 0.5
+        });
+
+        const scarfMat = new THREE.MeshStandardMaterial({
+            color: 0xf43f5e, // Warm winter red/rose knit
+            roughness: 0.8
+        });
+
+        // 5. Build Minti Character Rig
+        const rootGroup = new THREE.Group();
+        characterRef.current = rootGroup;
+        rootGroup.rotation.y = rotationYRef.current;
+        rootGroup.userData = { wobble: 0, blinkTimer: 0, isBlinking: false };
+        scene.add(rootGroup);
+
+        // Ground Contact Shadow Disk (so Minti is grounded with depth and never washes out)
+        const shadowCanvas = document.createElement("canvas");
+        shadowCanvas.width = 64;
+        shadowCanvas.height = 64;
+        const sCtx = shadowCanvas.getContext("2d");
+        const sGrad = sCtx.createRadialGradient(32, 32, 0, 32, 32, 30);
+        sGrad.addColorStop(0, "rgba(220, 160, 160, 0.45)");
+        sGrad.addColorStop(0.5, "rgba(245, 175, 175, 0.2)");
+        sGrad.addColorStop(1, "rgba(255, 255, 255, 0)");
+        sCtx.fillStyle = sGrad;
+        sCtx.fillRect(0, 0, 64, 64);
+
+        const shadowTexture = new THREE.CanvasTexture(shadowCanvas);
+        const groundShadowGeo = new THREE.PlaneGeometry(1.5, 1.5);
+        const groundShadowMat = new THREE.MeshBasicMaterial({
+            map: shadowTexture,
+            transparent: true,
+            depthWrite: false
+        });
+        const groundShadow = new THREE.Mesh(groundShadowGeo, groundShadowMat);
+        groundShadow.rotation.x = -Math.PI / 2;
+        groundShadow.position.y = -0.73;
+        scene.add(groundShadow);
+
+        // Main Body (Cute chubby pear silhouette)
+        const bodyGeo = new THREE.SphereGeometry(0.72, 36, 36);
+        bodyGeo.scale(1.02, 1.15, 0.95);
+        const bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
+        bodyMesh.position.y = 0;
+        bodyMesh.castShadow = true;
+        rootGroup.add(bodyMesh);
+
+        // Soft Belly Patch (Warmer subtle cream highlights)
+        const bellyGeo = new THREE.SphereGeometry(0.54, 24, 24);
+        bellyGeo.scale(0.85, 0.95, 0.3);
+        const bellyMesh = new THREE.Mesh(bellyGeo, bellyMat);
+        bellyMesh.position.set(0, -0.06, 0.42);
+        rootGroup.add(bellyMesh);
+
+        // Cheeks (Rosy Pink Blush)
+        const cheekGeo = new THREE.SphereGeometry(0.12, 20, 20);
+        cheekGeo.scale(1.25, 0.65, 0.45);
+
+        const leftCheek = new THREE.Mesh(cheekGeo, pinkBlushMat);
+        leftCheek.position.set(-0.38, 0.04, 0.62);
+        rootGroup.add(leftCheek);
+
+        const rightCheek = new THREE.Mesh(cheekGeo, pinkBlushMat);
+        rightCheek.position.set(0.38, 0.04, 0.62);
+        rootGroup.add(rightCheek);
+
+        // Eyes Group (Chibi Glossy Anime Eyes with dual sparkles)
+        const eyesGroup = new THREE.Group();
+        rootGroup.add(eyesGroup);
+        rootGroup.userData.eyesGroup = eyesGroup;
+
+        const eyeGeo = new THREE.SphereGeometry(0.13, 28, 28);
+        eyeGeo.scale(0.95, 1.25, 0.55);
+
+        // Left Eye
+        const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
+        leftEye.position.set(-0.25, 0.17, 0.64);
+        const leftSpecMain = new THREE.Mesh(new THREE.SphereGeometry(0.042, 16, 16), specularMat);
+        leftSpecMain.position.set(-0.22, 0.22, 0.72);
+        const leftSpecSub = new THREE.Mesh(new THREE.SphereGeometry(0.022, 12, 12), specularMat);
+        leftSpecSub.position.set(-0.28, 0.12, 0.70);
+        eyesGroup.add(leftEye, leftSpecMain, leftSpecSub);
+
+        // Right Eye
+        const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
+        rightEye.position.set(0.25, 0.17, 0.64);
+        const rightSpecMain = new THREE.Mesh(new THREE.SphereGeometry(0.042, 16, 16), specularMat);
+        rightSpecMain.position.set(0.22, 0.22, 0.72);
+        const rightSpecSub = new THREE.Mesh(new THREE.SphereGeometry(0.022, 12, 12), specularMat);
+        rightSpecSub.position.set(0.28, 0.12, 0.70);
+        eyesGroup.add(rightEye, rightSpecMain, rightSpecSub);
+
+        // Cute Mouth / Smile with little pink tongue
+        const mouthCurve = new THREE.QuadraticBezierCurve3(
+            new THREE.Vector3(-0.065, 0.01, 0.70),
+            new THREE.Vector3(0, -0.065, 0.71),
+            new THREE.Vector3(0.065, 0.01, 0.70)
+        );
+        const mouthGeo = new THREE.TubeGeometry(mouthCurve, 16, 0.016, 8, false);
+        const mouthMesh = new THREE.Mesh(mouthGeo, mouthMat);
+        rootGroup.add(mouthMesh);
+
+        const tongueGeo = new THREE.SphereGeometry(0.035, 12, 12);
+        tongueGeo.scale(1.2, 0.8, 0.5);
+        const tongueMesh = new THREE.Mesh(tongueGeo, tongueMat);
+        tongueMesh.position.set(0, -0.045, 0.705);
+        rootGroup.add(tongueMesh);
+
+        // Floppy Drooping Ears (with soft rose inner ear)
+        const earGeo = new THREE.SphereGeometry(0.22, 24, 24);
+        earGeo.scale(0.68, 1.6, 0.48);
+
+        const leftEarGroup = new THREE.Group();
+        leftEarGroup.position.set(-0.62, 0.42, 0);
+        leftEarGroup.rotation.z = 0.48;
+        const leftEar = new THREE.Mesh(earGeo, bodyMat);
+        const leftInnerEar = new THREE.Mesh(earGeo, earInnerMat);
+        leftInnerEar.scale.set(0.62, 0.78, 0.6);
+        leftInnerEar.position.set(0, 0, 0.04);
+        leftEarGroup.add(leftEar, leftInnerEar);
+        rootGroup.add(leftEarGroup);
+        rootGroup.userData.leftEar = leftEarGroup;
+
+        const rightEarGroup = new THREE.Group();
+        rightEarGroup.position.set(0.62, 0.42, 0);
+        rightEarGroup.rotation.z = -0.48;
+        const rightEar = new THREE.Mesh(earGeo, bodyMat);
+        const rightInnerEar = new THREE.Mesh(earGeo, earInnerMat);
+        rightInnerEar.scale.set(0.62, 0.78, 0.6);
+        rightInnerEar.position.set(0, 0, 0.04);
+        rightEarGroup.add(rightEar, rightInnerEar);
+        rootGroup.add(rightEarGroup);
+        rootGroup.userData.rightEar = rightEarGroup;
+
+        // Limbs (Chubby Paws & Feet)
+        const armGeo = new THREE.SphereGeometry(0.14, 18, 18);
+        armGeo.scale(0.85, 1.35, 0.85);
+
+        const leftArm = new THREE.Mesh(armGeo, bodyMat);
+        leftArm.position.set(-0.55, -0.15, 0.25);
+        leftArm.rotation.z = 0.32;
+        rootGroup.add(leftArm);
+        rootGroup.userData.leftArm = leftArm;
+
+        const rightArm = new THREE.Mesh(armGeo, bodyMat);
+        rightArm.position.set(0.55, -0.15, 0.25);
+        rightArm.rotation.z = -0.32;
+        rootGroup.add(rightArm);
+        rootGroup.userData.rightArm = rightArm;
+
+        const footGeo = new THREE.SphereGeometry(0.16, 18, 18);
+        footGeo.scale(1.2, 0.7, 1.45);
+        const leftFoot = new THREE.Mesh(footGeo, bodyMat);
+        leftFoot.position.set(-0.3, -0.72, 0.12);
+        const rightFoot = new THREE.Mesh(footGeo, bodyMat);
+        rightFoot.position.set(0.3, -0.72, 0.12);
+        rootGroup.add(leftFoot, rightFoot);
+
+        // 6. Accessories, Jewelry & Outfit Props
+
+        // Signature Sprout on Head (Active unless a full hat is equipped)
+        const shouldShowSprout = equippedAccessory === "sprout" || (!equippedHat || equippedHat === "none_hat");
+        if (shouldShowSprout) {
+            const sproutGroup = new THREE.Group();
+            sproutGroup.position.set(0, 0.78, 0);
+
+            const stemCurve = new THREE.QuadraticBezierCurve3(
+                new THREE.Vector3(0, 0, 0),
+                new THREE.Vector3(0.04, 0.16, 0),
+                new THREE.Vector3(0.02, 0.28, 0)
+            );
+            const stemGeo = new THREE.TubeGeometry(stemCurve, 10, 0.025, 8, false);
+            const stemMesh = new THREE.Mesh(stemGeo, greenSproutMat);
+            sproutGroup.add(stemMesh);
+
+            const leafGeo = new THREE.SphereGeometry(0.12, 16, 16);
+            leafGeo.scale(1.6, 0.22, 0.8);
+            const leaf1 = new THREE.Mesh(leafGeo, greenSproutMat);
+            leaf1.position.set(0.12, 0.25, 0);
+            leaf1.rotation.z = 0.42;
+            const leaf2 = new THREE.Mesh(leafGeo, greenSproutMat);
+            leaf2.position.set(-0.11, 0.22, 0);
+            leaf2.rotation.z = -0.42;
+            sproutGroup.add(leaf1, leaf2);
+
+            // Cute Pink Flower Bud on Top (exact matching of reference illustration)
+            const flowerBud = new THREE.Mesh(new THREE.SphereGeometry(0.048, 12, 12), flowerBudMat);
+            flowerBud.position.set(0.02, 0.31, 0);
+            flowerBud.scale.set(0.9, 1.2, 0.9);
+            sproutGroup.add(flowerBud);
+
+            rootGroup.add(sproutGroup);
+            rootGroup.userData.sproutGroup = sproutGroup;
+        }
+
+        // Backpack on back (Active for classic outfit or when backpack equipped)
+        if (equippedOutfit === "classic" || equippedAccessory === "backpack") {
+            const backpackGeo = new THREE.BoxGeometry(0.48, 0.58, 0.3);
+            const backpackMesh = new THREE.Mesh(backpackGeo, backpackMat);
+            backpackMesh.position.set(0, -0.05, -0.65);
+
+            // Pocket & handle details
+            const pocket = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.28, 0.1), new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.5 }));
+            pocket.position.set(0, -0.1, -0.18);
+            backpackMesh.add(pocket);
+
+            rootGroup.add(backpackMesh);
+        }
+
+        // Jewelry & Piercings (Hoops, Star Studs, Ear Cuffs, Chain Necklace)
+        if (equippedJewelry === "silver_hoops") {
+            const hoopGeo = new THREE.TorusGeometry(0.065, 0.016, 8, 20);
+            const leftHoop = new THREE.Mesh(hoopGeo, silverMat);
+            leftHoop.position.set(0, -0.32, 0.04);
+            leftEarGroup.add(leftHoop);
+            const rightHoop = new THREE.Mesh(hoopGeo, silverMat);
+            rightHoop.position.set(0, -0.32, 0.04);
+            rightEarGroup.add(rightHoop);
+        } else if (equippedJewelry === "star_studs") {
+            const starGeo = new THREE.ConeGeometry(0.05, 0.03, 5);
+            const leftStar = new THREE.Mesh(starGeo, goldCrownMat);
+            leftStar.position.set(0, -0.22, 0.06);
+            leftStar.rotation.x = Math.PI / 2;
+            leftEarGroup.add(leftStar);
+            const rightStar = new THREE.Mesh(starGeo, goldCrownMat);
+            rightStar.position.set(0, -0.22, 0.06);
+            rightStar.rotation.x = Math.PI / 2;
+            rightEarGroup.add(rightStar);
+        } else if (equippedJewelry === "ear_cuffs") {
+            const cuffGeo = new THREE.TorusGeometry(0.05, 0.018, 8, 16, Math.PI * 1.5);
+            const leftCuff1 = new THREE.Mesh(cuffGeo, goldCrownMat);
+            leftCuff1.position.set(0.06, 0.05, 0.02);
+            leftEarGroup.add(leftCuff1);
+            const rightCuff1 = new THREE.Mesh(cuffGeo, goldCrownMat);
+            rightCuff1.position.set(-0.06, 0.05, 0.02);
+            rightEarGroup.add(rightCuff1);
+        } else if (equippedJewelry === "chain_necklace") {
+            const chainGeo = new THREE.TorusGeometry(0.38, 0.02, 8, 30);
+            chainGeo.scale(1, 0.7, 1);
+            const chainMesh = new THREE.Mesh(chainGeo, silverMat);
+            chainMesh.position.set(0, -0.22, 0.32);
+            chainMesh.rotation.x = Math.PI / 3;
+
+            // Mini star pendant
+            const pendant = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.03, 5), goldCrownMat);
+            pendant.position.set(0, -0.32, 0.58);
+            rootGroup.add(chainMesh, pendant);
+        }
+
+        // Outfits Custom Props
+        if (equippedOutfit === "winter") {
+            // Cozy wrapped woolen scarf around neck
+            const scarfGeo = new THREE.TorusGeometry(0.42, 0.1, 10, 24);
+            const scarfMesh = new THREE.Mesh(scarfGeo, scarfMat);
+            scarfMesh.position.set(0, -0.16, 0.28);
+            scarfMesh.rotation.x = Math.PI / 3;
+
+            // Hanging scarf tails
+            const tailGeo = new THREE.BoxGeometry(0.12, 0.42, 0.04);
+            const tail = new THREE.Mesh(tailGeo, scarfMat);
+            tail.position.set(0.18, -0.38, 0.56);
+            tail.rotation.z = -0.15;
+            rootGroup.add(scarfMesh, tail);
+        } else if (equippedOutfit === "student") {
+            // Academic satchel strap across chest
+            const strapCurve = new THREE.CatmullRomCurve3([
+                new THREE.Vector3(-0.45, 0.35, 0.35),
+                new THREE.Vector3(0, 0, 0.55),
+                new THREE.Vector3(0.45, -0.35, 0.45)
+            ]);
+            const strapGeo = new THREE.TubeGeometry(strapCurve, 16, 0.035, 8, false);
+            const strapMesh = new THREE.Mesh(strapGeo, new THREE.MeshStandardMaterial({ color: 0x78350f }));
+            rootGroup.add(strapMesh);
+        } else if (equippedOutfit === "gaming") {
+            // Neon cyan collar line
+            const gamingCollarGeo = new THREE.TorusGeometry(0.42, 0.03, 8, 24);
+            const gamingCollar = new THREE.Mesh(gamingCollarGeo, new THREE.MeshBasicMaterial({ color: 0x06b6d4 }));
+            gamingCollar.position.set(0, -0.18, 0.3);
+            gamingCollar.rotation.x = Math.PI / 3;
+            rootGroup.add(gamingCollar);
+        } else if (equippedOutfit === "hoodie") {
+            // Streetwear hoodie collar and drawstrings
+            const hoodieCollarGeo = new THREE.TorusGeometry(0.44, 0.09, 8, 24);
+            const hoodieMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.7 });
+            const hoodieCollar = new THREE.Mesh(hoodieCollarGeo, hoodieMat);
+            hoodieCollar.position.set(0, -0.18, 0.28);
+            hoodieCollar.rotation.x = Math.PI / 3;
+
+            const stringGeo = new THREE.CylinderGeometry(0.012, 0.012, 0.25);
+            const strLeft = new THREE.Mesh(stringGeo, silverMat);
+            strLeft.position.set(-0.12, -0.34, 0.58);
+            const strRight = new THREE.Mesh(stringGeo, silverMat);
+            strRight.position.set(0.12, -0.34, 0.58);
+            rootGroup.add(hoodieCollar, strLeft, strRight);
+        }
+
+        // Hats (Crown, Beanie, Cap, Wizard Hat, Nightcap, Bucket Hat)
+        if (equippedHat === "crown" || state === "levelup") {
+            const crownGroup = new THREE.Group();
+            crownGroup.position.set(0, 0.85, 0);
+            const crownBase = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.35, 0.15, 18), goldCrownMat);
+            crownGroup.add(crownBase);
+            for (let i = 0; i < 5; i++) {
+                const spike = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.18, 6), goldCrownMat);
+                const angle = (i / 5) * Math.PI * 2;
+                spike.position.set(Math.cos(angle) * 0.3, 0.15, Math.sin(angle) * 0.3);
+                crownGroup.add(spike);
+            }
+            rootGroup.add(crownGroup);
+        } else if (equippedHat === "beanie") {
+            const beanieGeo = new THREE.SphereGeometry(0.46, 24, 24);
+            beanieGeo.scale(1, 0.8, 1);
+            const beanieMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6 });
+            const beanieMesh = new THREE.Mesh(beanieGeo, beanieMat);
+            beanieMesh.position.set(0, 0.65, 0);
+            const pompom = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 12), new THREE.MeshStandardMaterial({ color: 0xffffff }));
+            pompom.position.set(0, 0.98, 0);
+            beanieMesh.add(pompom);
+            rootGroup.add(beanieMesh);
+        } else if (equippedHat === "cap") {
+            const capGroup = new THREE.Group();
+            capGroup.position.set(0, 0.72, 0);
+            const capDome = new THREE.Mesh(new THREE.SphereGeometry(0.42, 20, 20), new THREE.MeshStandardMaterial({ color: 0xef4444 }));
+            capDome.scale.set(1, 0.65, 1);
+            const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.48, 0.04, 16), new THREE.MeshStandardMaterial({ color: 0xb91c1c }));
+            brim.position.set(0, -0.08, 0.15);
+            brim.scale.set(1, 1, 1.4);
+            capGroup.add(capDome, brim);
+            rootGroup.add(capGroup);
+        } else if (equippedHat === "wizard_hat") {
+            const wizGroup = new THREE.Group();
+            wizGroup.position.set(0, 0.75, 0);
+            const wizBrim = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.04, 20), new THREE.MeshStandardMaterial({ color: 0x6b21a8 }));
+            const wizCone = new THREE.Mesh(new THREE.ConeGeometry(0.35, 0.75, 18), new THREE.MeshStandardMaterial({ color: 0x7e22ce }));
+            wizCone.position.set(0, 0.38, 0);
+            wizGroup.add(wizBrim, wizCone);
+            rootGroup.add(wizGroup);
+        } else if (equippedHat === "nightcap") {
+            const nightGroup = new THREE.Group();
+            nightGroup.position.set(0, 0.75, 0);
+            const nightCone = new THREE.Mesh(new THREE.ConeGeometry(0.4, 0.65, 16), new THREE.MeshStandardMaterial({ color: 0x60a5fa }));
+            nightCone.rotation.z = -0.45;
+            nightCone.position.set(0.15, 0.25, 0);
+            const nightPompom = new THREE.Mesh(new THREE.SphereGeometry(0.09, 12, 12), specularMat);
+            nightPompom.position.set(0.36, 0.48, 0);
+            nightGroup.add(nightCone, nightPompom);
+            rootGroup.add(nightGroup);
+        } else if (equippedHat === "bucket_hat") {
+            const bucketGroup = new THREE.Group();
+            bucketGroup.position.set(0, 0.72, 0);
+            const bucketTop = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.42, 0.28, 18), new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.6 }));
+            const bucketBrim = new THREE.Mesh(new THREE.ConeGeometry(0.58, 0.15, 18), new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.6 }));
+            bucketBrim.position.y = -0.15;
+            bucketGroup.add(bucketTop, bucketBrim);
+            rootGroup.add(bucketGroup);
+        }
+
+        // Glasses (Round, Sunglasses, Cyber Shades)
+        if (equippedGlasses === "round_glasses") {
+            const glassesGroup = new THREE.Group();
+            glassesGroup.position.set(0, 0.17, 0.66);
+            const ringGeo = new THREE.TorusGeometry(0.13, 0.018, 8, 24);
+            const glassMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.85, roughness: 0.2 });
+            const leftGlass = new THREE.Mesh(ringGeo, glassMat);
+            leftGlass.position.x = -0.25;
+            const rightGlass = new THREE.Mesh(ringGeo, glassMat);
+            rightGlass.position.x = 0.25;
+            const bridge = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.14), glassMat);
+            bridge.rotation.z = Math.PI / 2;
+            glassesGroup.add(leftGlass, rightGlass, bridge);
+            rootGroup.add(glassesGroup);
+        } else if (equippedGlasses === "sunglasses") {
+            const shadesGroup = new THREE.Group();
+            shadesGroup.position.set(0, 0.17, 0.66);
+            const shadeMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.1, metalness: 0.8 });
+            const leftShade = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.18, 0.04), shadeMat);
+            leftShade.position.x = -0.25;
+            const rightShade = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.18, 0.04), shadeMat);
+            rightShade.position.x = 0.25;
+            const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.03, 0.02), shadeMat);
+            shadesGroup.add(leftShade, rightShade, bridge);
+            rootGroup.add(shadesGroup);
+        } else if (equippedGlasses === "cyber_shades") {
+            const visorGeo = new THREE.CylinderGeometry(0.48, 0.48, 0.16, 20, 1, true, -Math.PI / 3, Math.PI * 0.66);
+            const visorMat = new THREE.MeshStandardMaterial({
+                color: 0x06b6d4,
+                emissive: 0x0891b2,
+                emissiveIntensity: 0.6,
+                roughness: 0.1,
+                metalness: 0.9,
+                transparent: true,
+                opacity: 0.88
+            });
+            const visorMesh = new THREE.Mesh(visorGeo, visorMat);
+            visorMesh.position.set(0, 0.17, 0.42);
+            rootGroup.add(visorMesh);
+        }
+
+        // Headphones (Pink Lo-Fi or Gaming)
+        if (equippedAccessory === "headphones" || equippedOutfit === "gaming") {
+            const hpGroup = new THREE.Group();
+            hpGroup.position.set(0, 0.38, 0);
+
+            const bandCurve = new THREE.QuadraticBezierCurve3(
+                new THREE.Vector3(-0.68, 0, 0),
+                new THREE.Vector3(0, 0.62, 0),
+                new THREE.Vector3(0.68, 0, 0)
+            );
+            const bandGeo = new THREE.TubeGeometry(bandCurve, 20, 0.032, 8, false);
+            const hpMat = new THREE.MeshStandardMaterial({ color: 0xf472b6, roughness: 0.3 });
+            const bandMesh = new THREE.Mesh(bandGeo, hpMat);
+            hpGroup.add(bandMesh);
+
+            const earCupGeo = new THREE.CylinderGeometry(0.16, 0.16, 0.12, 18);
+            const leftCup = new THREE.Mesh(earCupGeo, hpMat);
+            leftCup.position.set(-0.68, 0, 0);
+            leftCup.rotation.z = Math.PI / 2;
+            const rightCup = new THREE.Mesh(earCupGeo, hpMat);
+            rightCup.position.set(0.68, 0, 0);
+            rightCup.rotation.z = Math.PI / 2;
+            hpGroup.add(leftCup, rightCup);
+
+            rootGroup.add(hpGroup);
+        }
+
+        // Floating Magic Star Accessory
+        if (equippedAccessory === "magic_star") {
+            const starGeo = new THREE.ConeGeometry(0.14, 0.08, 5);
+            const starMesh = new THREE.Mesh(starGeo, goldCrownMat);
+            starMesh.position.set(0.65, 0.55, 0.3);
+            rootGroup.add(starMesh);
+            rootGroup.userData.magicStar = starMesh;
+        }
+
+        // Study Book in hands (Active in 'study' state or student outfit)
+        if (state === "study" || equippedOutfit === "student") {
+            const bookGroup = new THREE.Group();
+            bookGroup.position.set(0, -0.15, 0.62);
+            bookGroup.rotation.x = -0.32;
+
+            const coverMat = new THREE.MeshStandardMaterial({ color: 0x059669 });
+            const pageMat = new THREE.MeshStandardMaterial({ color: 0xfafafa, roughness: 0.8 });
+
+            const leftCover = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.42, 0.02), coverMat);
+            leftCover.position.set(-0.16, 0, 0);
+            leftCover.rotation.y = 0.25;
+
+            const rightCover = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.42, 0.02), coverMat);
+            rightCover.position.set(0.16, 0, 0);
+            rightCover.rotation.y = -0.25;
+
+            const pages = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.38, 0.06), pageMat);
+            bookGroup.add(leftCover, rightCover, pages);
+            rootGroup.add(bookGroup);
+
+            // Re-pose arms to hold book
+            leftArm.position.set(-0.35, -0.12, 0.55);
+            leftArm.rotation.set(-0.4, 0.4, 0.6);
+            rightArm.position.set(0.35, -0.12, 0.55);
+            rightArm.rotation.set(-0.4, -0.4, -0.6);
+        }
+
+        // Streak Flame (Active in 'streak' state)
+        if (state === "streak") {
+            const flameMat = new THREE.MeshBasicMaterial({ color: 0xf97316 });
+            const flameGeo = new THREE.ConeGeometry(0.18, 0.45, 12);
+            const flameMesh = new THREE.Mesh(flameGeo, flameMat);
+            flameMesh.position.set(0.42, 0.15, 0.5);
+            rootGroup.add(flameMesh);
+            rootGroup.userData.flameMesh = flameMesh;
+        }
+
+        // 7. Interactive 360-Degree Pointer Drag / Swipe Orbit Controls
+        const handlePointerDown = (e) => {
+            if (!interactive) return;
+            isDraggingRef.current = true;
+            startXRef.current = e.clientX || (e.touches && e.touches[0].clientX) || 0;
+            dragDistanceRef.current = 0;
+        };
+
+        const handlePointerMove = (e) => {
+            if (!isDraggingRef.current || !rootGroup) return;
+            const currentX = e.clientX || (e.touches && e.touches[0].clientX) || 0;
+            const deltaX = currentX - startXRef.current;
+            dragDistanceRef.current += Math.abs(deltaX);
+            startXRef.current = currentX;
+
+            rotationYRef.current += deltaX * 0.014;
+            rootGroup.rotation.y = rotationYRef.current;
+        };
+
+        const handlePointerUp = () => {
+            if (!isDraggingRef.current) return;
+            isDraggingRef.current = false;
+            if (dragDistanceRef.current < 6) {
+                // Treated as a click/tap
+                triggerClickReaction();
+            }
+        };
+
+        const domElem = renderer.domElement;
+        domElem.addEventListener("pointerdown", handlePointerDown);
+        window.addEventListener("pointermove", handlePointerMove);
+        window.addEventListener("pointerup", handlePointerUp);
+
+        // 8. Animation Loop
+        let clock = new THREE.Clock();
+
+        const animate = () => {
+            animFrameRef.current = requestAnimationFrame(animate);
+            const elapsed = clock.getElapsedTime();
+
+            if (!rootGroup) return;
+
+            // Gentle breathing cycle
+            const breath = Math.sin(elapsed * 2.2) * 0.035;
+            bodyMesh.scale.y = 1.15 + breath;
+            bodyMesh.scale.x = 1.02 - breath * 0.45;
+
+            // Sprout swaying naturally
+            if (rootGroup.userData.sproutGroup) {
+                rootGroup.userData.sproutGroup.rotation.z = Math.sin(elapsed * 3) * 0.12;
+            }
+
+            // Ear twitching
+            if (rootGroup.userData.leftEar && rootGroup.userData.rightEar) {
+                rootGroup.userData.leftEar.rotation.z = 0.48 + Math.sin(elapsed * 2) * 0.05;
+                rootGroup.userData.rightEar.rotation.z = -0.48 - Math.sin(elapsed * 2) * 0.05;
+            }
+
+            // Magic Star orbit
+            if (rootGroup.userData.magicStar) {
+                rootGroup.userData.magicStar.position.x = Math.cos(elapsed * 2) * 0.65;
+                rootGroup.userData.magicStar.position.z = Math.sin(elapsed * 2) * 0.65;
+                rootGroup.userData.magicStar.rotation.y = elapsed * 4;
+            }
+
+            // Natural Eye Blinking
+            rootGroup.userData.blinkTimer += 0.016;
+            if (rootGroup.userData.blinkTimer > 3.6) {
+                eyesGroup.scale.y = 0.08;
+                if (rootGroup.userData.blinkTimer > 3.75) {
+                    eyesGroup.scale.y = 1.0;
+                    rootGroup.userData.blinkTimer = 0;
+                }
+            }
+
+            // Subtle Idle Swaying when not user-dragging
+            if (!isDraggingRef.current) {
+                // If rotated far away, slow smooth return towards front or gentle sway
+                const idleSway = Math.sin(elapsed * 1.5) * 0.06;
+                rootGroup.rotation.y = rotationYRef.current + idleSway;
+            }
+
+            // State-specific animations
+            if (state === "welcome") {
+                // Happy wave
+                rightArm.position.set(0.55, 0.25, 0.25);
+                rightArm.rotation.z = -1.2 + Math.sin(elapsed * 8) * 0.4;
+                rootGroup.position.y = Math.sin(elapsed * 4) * 0.08;
+            } else if (state === "completed" || state === "happy") {
+                // Happy celebration jump
+                rootGroup.position.y = Math.abs(Math.sin(elapsed * 6)) * 0.22;
+                leftArm.rotation.z = 0.8 + Math.sin(elapsed * 8) * 0.3;
+                rightArm.rotation.z = -0.8 - Math.sin(elapsed * 8) * 0.3;
+            } else if (state === "levelup") {
+                // Level up celebratory spin
+                rotationYRef.current += 0.06;
+                rootGroup.position.y = Math.sin(elapsed * 5) * 0.15;
+            } else if (state === "streak") {
+                // Sway with flame
+                rootGroup.position.y = Math.sin(elapsed * 3) * 0.04;
+                if (rootGroup.userData.flameMesh) {
+                    rootGroup.userData.flameMesh.scale.y = 1.0 + Math.sin(elapsed * 12) * 0.25;
+                }
+            } else if (state === "sleep") {
+                // Resting
+                rootGroup.position.y = -0.15;
+                rootGroup.rotation.x = 0.12;
+                eyesGroup.scale.y = 0.05; // Closed eyes
+            } else if (state === "boss_defeat") {
+                // Victory celebration
+                rootGroup.position.y = Math.sin(elapsed * 7) * 0.18;
+            }
+
+            // Click wobble dampening (sets rotation.z smoothly without accumulating)
+            if (rootGroup.userData.wobble > 0) {
+                rootGroup.rotation.z = Math.sin(elapsed * 24) * rootGroup.userData.wobble * 0.14;
+                rootGroup.userData.wobble = Math.max(0, rootGroup.userData.wobble - 0.025);
+            } else {
+                rootGroup.rotation.z = 0;
+            }
+
+            renderer.render(scene, camera);
+        };
+
+        animate();
+
+        // Responsive resize
+        const handleResize = () => {
+            if (!container || !renderer || !camera) return;
+            const newW = container.clientWidth;
+            const newH = container.clientHeight;
+            camera.aspect = newW / newH;
+            camera.updateProjectionMatrix();
+            renderer.setSize(newW, newH);
+        };
+        window.addEventListener("resize", handleResize);
+
+        return () => {
+            window.removeEventListener("resize", handleResize);
+            domElem.removeEventListener("pointerdown", handlePointerDown);
+            window.removeEventListener("pointermove", handlePointerMove);
+            window.removeEventListener("pointerup", handlePointerUp);
+            cancelAnimationFrame(animFrameRef.current);
+            if (renderer.domElement && renderer.domElement.parentNode) {
+                renderer.domElement.parentNode.removeChild(renderer.domElement);
+            }
+            renderer.dispose();
+        };
+    }, [state, equippedHat, equippedGlasses, equippedOutfit, equippedAccessory, equippedJewelry, size]);
 
     return (
-        <div
-            ref={cardRef}
-            onClick={onClick}
-            onMouseMove={handleMouseMove}
-            onMouseLeave={handleMouseLeave}
-            style={tiltStyle}
-            title={t("click_profile_hint")}
-            className={`p-4 rounded-2xl text-white space-y-3.5 cursor-pointer relative overflow-hidden aura-${stats.active_theme || 'default'}`}
+        <div 
+            className="character-canvas-container"
+            title={interactive ? (characterName + " - " + (window.I18N_DICT && window.I18N_DICT.fa && window.I18N_DICT.fa.rotate_hint || "بکشید تا بچرخد")) : ""}
         >
-            {/* هایلایت هولوگرافیک */}
-            <div className="flex items-start justify-between gap-2">
-                <div>
-                    <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="px-2 py-0.5 rounded-md metallic-gold-badge text-[10px] tracking-wider">
-                            LVL {stats.level || 1}
-                        </span>
-                        <span className="px-2 py-0.5 rounded-md metallic-platinum-badge text-[10px]">
-                            {lang === "fa" ? (stats.title_fa || "نوآموز خواب‌آلود") : (stats.title || "Sleepy Novice")}
-                        </span>
-                    </div>
-                    <h3 className="font-extrabold text-lg mt-2 flex items-center gap-1.5 tracking-tight">
-                        <span>{stats.username}</span>
-                        <span className="text-xs opacity-80">⚡</span>
-                    </h3>
-                    <span className="text-[10px] opacity-80 block">
-                        {activeThemeObj ? (lang === "fa" ? activeThemeObj.name_fa : activeThemeObj.name) : "Cyber Slate"}
-                    </span>
+            {speechText && (
+                <div className="speech-bubble">
+                    {speechText}
                 </div>
-                <span className="px-2.5 py-1 rounded-xl bg-black/50 border border-white/15 backdrop-blur-md text-xs font-black text-amber-300">
-                    #{stats.leaderboard_rank}
-                </span>
-            </div>
-
-            {/* HUD XP Bar */}
-            <div className="space-y-1 bg-black/35 p-2.5 rounded-xl border border-white/10">
-                <div className="flex justify-between text-[10px] font-bold">
-                    <span className="text-cyan-300">HUD XP</span>
-                    <span>{stats.xp || 0} / {stats.next_level_xp || 150} ({xpPct}%)</span>
-                </div>
-                <div className="w-full h-2 bg-black/60 rounded-full overflow-hidden">
-                    <div
-                        className="h-full bg-gradient-to-r from-violet-500 via-cyan-400 to-amber-300 rounded-full transition-all duration-500"
-                        style={{ width: `${xpPct}%` }}
-                    ></div>
-                </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-                <div className="bg-black/40 border border-white/10 rounded-xl p-2 text-center">
-                    <span className="block text-sm font-black text-amber-300">{stats.coins} 🪙</span>
-                    <span className="text-[10px] opacity-75">{t("coins_unit")}</span>
-                </div>
-                <div className="bg-black/40 border border-white/10 rounded-xl p-2 text-center">
-                    <span className="block text-sm font-black text-orange-400">{stats.current_streak} / 7 🔥</span>
-                    <span className="text-[10px] opacity-75">{t("day_label")}</span>
-                </div>
-            </div>
+            )}
+            <div ref={mountRef} className="w-full h-full flex items-center justify-center" />
         </div>
     );
 }
 
-/* ۳. سکشن Hero اینتراکتیو با ماک‌آپ زنده باس‌فایت و دکمه Attack */
-function LiveBossEncounterHero(props) {
-    const { activeRaid, lang, t, onEngagePomodoro } = props;
-    const [simHp, setSimHp] = useState(2400);
-    const maxSimHp = 3000;
-    const [shaking, setShaking] = useState(false);
-    const [dmgPops, setDmgPops] = useState([]);
-
-    const bossTitle = activeRaid ? activeRaid.boss_name : t("hero_sim_boss_name");
-    const currentHp = activeRaid ? activeRaid.current_hp : simHp;
-    const maxHp = activeRaid ? activeRaid.max_hp : maxSimHp;
-    const rewardCoins = activeRaid ? activeRaid.reward_coins : 1200;
-    const hpPercent = Math.max(0, Math.min(100, Math.round((currentHp / maxHp) * 100)));
-
-    const triggerTestStrike = (e) => {
-        playSwordSlashSound();
-        spawnParticleBurst(e.clientX, e.clientY, ["#ef4444", "#f97316", "#facc15"]);
-        setShaking(true);
-        setTimeout(() => setShaking(false), 500);
-
-        if (!activeRaid) {
-            setSimHp(prev => (prev <= 50 ? maxSimHp : prev - 25));
-        }
-
-        const id = Date.now() + Math.random();
-        setDmgPops(prev => [...prev, { id, text: "-25 HP CRITICAL! ⚔️" }]);
-        setTimeout(() => {
-            setDmgPops(prev => prev.filter(p => p.id !== id));
-        }, 950);
-    };
-
-    return (
-        <div className={`bento-card rim-light-boss p-6 sm:p-7 relative overflow-hidden bg-gradient-to-br from-zinc-950 via-red-950/25 to-zinc-950 ${shaking ? "boss-shake" : ""}`}>
-            {/* نمایش اعداد دمیج شناور */}
-            <div className="absolute top-6 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center">
-                {dmgPops.map(p => (
-                    <span key={p.id} className="damage-pop text-lg sm:text-xl font-black text-amber-300 drop-shadow-[0_2px_10px_rgba(239,68,68,0.9)]">
-                        {p.text}
-                    </span>
-                ))}
-            </div>
-
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
-                <div className="space-y-3 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                        <span className="px-3 py-1 rounded-full bg-red-500/20 border border-red-500/50 text-red-300 text-[11px] font-black tracking-wider">
-                            {t("hero_boss_badge")}
-                        </span>
-                        <span className="px-3 py-1 rounded-full metallic-gold-badge text-[11px]">
-                            BOUNTY: +{rewardCoins} 🪙
-                        </span>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                        <span className="text-3xl sm:text-4xl">🐉</span>
-                        <div>
-                            <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">{bossTitle}</h2>
-                            <p className="text-xs text-slate-400 mt-0.5">{t("hero_boss_hint")}</p>
-                        </div>
-                    </div>
-
-                    {/* نوار سلامتی گدازه‌ای بزرگ (Molten Boss HP Bar) */}
-                    <div className="space-y-1.5 pt-1">
-                        <div className="flex justify-between text-xs font-black">
-                            <span className="text-red-400">BOSS HEALTH (HP)</span>
-                            <span className="text-amber-300 font-display">{currentHp} / {maxHp} HP ({hpPercent}%)</span>
-                        </div>
-                        <div className="w-full h-4 bg-black/80 rounded-full overflow-hidden border border-red-500/40 p-0.5">
-                            <div
-                                className="h-full bg-gradient-to-r from-red-600 via-orange-500 to-amber-400 rounded-full transition-all duration-300 shadow-[0_0_15px_rgba(239,68,68,0.8)]"
-                                style={{ width: `${hpPercent}%` }}
-                            ></div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* دکمه‌های اکشن و حمله (Attack Controls) */}
-                <div className="flex flex-col sm:flex-row lg:flex-col gap-2.5 shrink-0">
-                    <button
-                        type="button"
-                        onClick={onEngagePomodoro}
-                        className="attack-btn px-6 py-3.5 rounded-2xl text-xs sm:text-sm flex items-center justify-center gap-2"
-                    >
-                        <span>{t("hero_attack_cta")}</span>
-                    </button>
-                    <button
-                        type="button"
-                        onClick={triggerTestStrike}
-                        className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-red-500/20 border border-red-500/30 text-red-200 text-xs font-bold transition"
-                    >
-                        {t("hero_test_strike")}
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-function StudyHeatmap(props) {
-    const heatmapData = Array.isArray(props.heatmapData) ? props.heatmapData : [];
-    const t = typeof props.t === "function" ? props.t : (k) => k;
-
-    const days = [];
-    const map = {};
-    heatmapData.forEach(d => { map[d.date] = d.minutes; });
-
-    for (let i = 119; i >= 0; i--) {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
-        const iso = d.toISOString().split("T")[0];
-        days.push({ date: iso, mins: map[iso] || 0 });
-    }
-
-    return (
-        <div className="bento-card p-6 space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                <h3 className="font-black text-base flex items-center gap-2">
-                    <span className="text-accent">💠</span>
-                    <span>{t("heatmap_title")}</span>
-                </h3>
-                <span className="text-xs text-slate-400">{t("heatmap_sub")}</span>
-            </div>
-            <div className="flex flex-wrap gap-1.5 pt-2">
-                {days.map(d => {
-                    let bg = "bg-slate-800/40 border border-slate-700/30";
-                    if (d.mins >= 100) bg = "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]";
-                    else if (d.mins >= 50) bg = "bg-emerald-500";
-                    else if (d.mins >= 25) bg = "bg-emerald-700";
-                    else if (d.mins > 0) bg = "bg-emerald-900";
-
-                    return (
-                        <div
-                            key={d.date}
-                            title={`${d.date}: ${d.mins} mins`}
-                            className={`w-3.5 h-3.5 rounded-sm transition hover:scale-125 cursor-pointer ${bg}`}
-                        ></div>
-                    );
-                })}
-            </div>
-        </div>
-    );
-}
-
-function RaidSummonForm(props) {
-    const { groupId, lang, t, api, notify, onCreated } = props;
-    const [courseInput, setCourseInput] = useState("");
-    const [bossName, setBossName] = useState("");
-    const [suggestions, setSuggestions] = useState([]);
-    const [suggestLoading, setSuggestLoading] = useState(false);
-    const [hp, setHp] = useState(250);
-
-    const calculatedCoins = Math.floor((parseInt(hp, 10) || 0) / 25) * 10;
-
-    const handleSuggestBossNames = async () => {
-        if (!courseInput.trim()) {
-            notify(lang === "fa" ? "ابتدا نام درس یا هدف را وارد کنید!" : "Enter a course or goal first!", "error");
-            return;
-        }
-        setSuggestLoading(true);
-        try {
-            const res = await api("/ai/suggest-boss-name", {
-                method: "POST",
-                body: JSON.stringify({ course_or_goal: courseInput.trim(), lang })
-            });
-            const list = res.suggestions || [];
-            setSuggestions(list);
-            if (list.length > 0) setBossName(list[0]);
-        } catch (err) {
-            notify(err.message, "error");
-        } finally {
-            setSuggestLoading(false);
-        }
-    };
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        if (!courseInput.trim() && !bossName.trim()) return;
-        try {
-            await api(`/groups/${groupId}/raids`, {
-                method: "POST",
-                body: JSON.stringify({
-                    course_or_goal: courseInput.trim() || bossName.trim(),
-                    boss_name: bossName.trim() || null,
-                    max_hp: Math.max(25, parseInt(hp, 10) || 250),
-                    lang
-                })
-            });
-            setCourseInput("");
-            setBossName("");
-            setSuggestions([]);
-            notify(lang === "fa" ? "غول جدید احضار شد! ⚔️" : "Raid Boss Summoned! ⚔️");
-            if (typeof onCreated === "function") onCreated();
-        } catch (err) {
-            notify(err.message, "error");
-        }
-    };
-
-    return (
-        <form onSubmit={handleSubmit} className="space-y-3 pt-3 border-t border-red-500/25">
-            <div className="space-y-1.5">
-                <label className="block text-[11px] font-bold text-red-200">{t("raid_step1_label")}</label>
-                <div className="flex gap-2">
-                    <input
-                        value={courseInput}
-                        onChange={(e) => setCourseInput(e.target.value)}
-                        required
-                        placeholder={t("raid_course_ph")}
-                        className="flex-1 px-3 py-2 rounded-lg bg-black/50 border border-red-500/30 text-xs text-white focus:outline-none focus:border-red-400"
-                    />
-                    <button
-                        type="button"
-                        onClick={handleSuggestBossNames}
-                        disabled={suggestLoading}
-                        className="px-3 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold text-[11px] shrink-0 transition"
-                    >
-                        {suggestLoading ? t("raid_ai_loading") : t("raid_ai_suggest_btn")}
-                    </button>
-                </div>
-
-                {suggestions.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 pt-1">
-                        {suggestions.map((s, idx) => (
-                            <button
-                                key={idx}
-                                type="button"
-                                onClick={() => setBossName(s)}
-                                className={`text-[10px] px-2.5 py-1 rounded-full border font-bold transition ${bossName === s ? "bg-amber-500 text-slate-950 border-amber-300" : "bg-black/40 text-slate-300 border-slate-700 hover:border-amber-400"}`}
-                            >
-                                🐉 {s}
-                            </button>
-                        ))}
-                    </div>
-                )}
-
-                <input
-                    value={bossName}
-                    onChange={(e) => setBossName(e.target.value)}
-                    placeholder={t("raid_boss_name_ph")}
-                    className="w-full px-3 py-2 rounded-lg bg-black/35 border border-red-500/20 text-xs text-amber-300 font-bold focus:outline-none"
-                />
-            </div>
-
-            <div className="p-3 rounded-xl bg-black/40 border border-red-500/20 space-y-2">
-                <label className="block text-[11px] font-bold text-red-200">{t("raid_step2_label")}</label>
-                <div className="grid grid-cols-4 gap-1.5">
-                    {[100, 250, 500, 1000].map(presetHp => (
-                        <button
-                            key={presetHp}
-                            type="button"
-                            onClick={() => setHp(presetHp)}
-                            className={`py-1 rounded text-[10px] font-black border transition ${parseInt(hp, 10) === presetHp ? "bg-red-600 text-white border-red-400" : "bg-black/40 text-slate-300 border-slate-700"}`}
-                        >
-                            {presetHp} HP
-                        </button>
-                    ))}
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 items-center pt-1">
-                    <div>
-                        <span className="text-[10px] text-slate-400 block mb-0.5">HP (Min 25):</span>
-                        <input
-                            type="number"
-                            min="25"
-                            max="50000"
-                            step="25"
-                            value={hp}
-                            onChange={(e) => setHp(e.target.value)}
-                            required
-                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-red-500/40 text-sm font-black text-white text-center"
-                        />
-                    </div>
-
-                    <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-center">
-                        <span className="text-[10px] text-amber-200 block">{t("raid_locked_bounty")}</span>
-                        <span className="text-base font-black text-amber-400">🔒 {calculatedCoins} 🪙</span>
-                    </div>
-                </div>
-                <p className="text-[10px] text-slate-400">{t("raid_hp_Convert_rule")}</p>
-            </div>
-
-            <button type="submit" className="w-full py-2.5 rounded-xl attack-btn text-xs">
-                {t("raid_create_btn")}
-            </button>
-        </form>
-    );
-}
+// ----------------- MAIN APP COMPONENT -----------------
 
 function App() {
     const [lang, setLang] = useState(localStorage.getItem("studymate_lang") || "fa");
-    const [darkMode, setDarkMode] = useState((localStorage.getItem("studymate_color_mode") || "dark") === "dark");
-    const [activeTab, setActiveTab] = useState(window.INITIAL_TAB || "dashboard");
+    const [activeTab, setActiveTab] = useState("dashboard"); // dashboard, study, planner, friends, challenges, shop, reports, leaderboard, referrals
     const [token, setToken] = useState(localStorage.getItem("studymate_token") || "");
     const [showAuthModal, setShowAuthModal] = useState(!localStorage.getItem("studymate_token"));
-    const [authMode, setAuthMode] = useState("login");
+    const [authMode, setAuthMode] = useState("login"); // login, register, forgot
     const [toast, setToast] = useState(null);
 
+    // Core data
+    const [user, setUser] = useState(null);
     const [stats, setStats] = useState(null);
-    const [heatmap, setHeatmap] = useState([]);
+    const [weeklyChallenge, setWeeklyChallenge] = useState(null);
     const [courses, setCourses] = useState([]);
-    const [sessions, setSessions] = useState([]);
     const [themes, setThemes] = useState([]);
+    const [accessories, setAccessories] = useState([]);
+    const [friends, setFriends] = useState([]);
+    const [friendRequests, setFriendRequests] = useState([]);
     const [leaderboard, setLeaderboard] = useState([]);
-    const [lbTimeframe, setLbTimeframe] = useState("all_time");
-    const [groups, setGroups] = useState([]);
-    const [groupRaids, setGroupRaids] = useState({});
+    const [heatmap, setHeatmap] = useState([]);
+    const [referralInfo, setReferralInfo] = useState(null);
+    const [sessions, setSessions] = useState([]);
+
+    // Customization & Shop Preview State
+    const [previewItem, setPreviewItem] = useState(null); // Item currently tried on in 3D
+    const [previewTheme, setPreviewTheme] = useState(null); // Theme currently previewed
+
+    // Reports Analytics State
+    const [reportsPeriod, setReportsPeriod] = useState("week"); // 'week', 'month', 'all'
+    const [selectedHeatmapDay, setSelectedHeatmapDay] = useState(null);
+
+    // Timer state
+    const [timerRunning, setTimerRunning] = useState(false);
+    const [timerPaused, setTimerPaused] = useState(false);
+    const [targetMins, setTargetMins] = useState(25);
+    const [remainingSec, setRemainingSec] = useState(25 * 60);
+    const [activePomoId, setActivePomoId] = useState(null);
+    const [selectedCourseId, setSelectedCourseId] = useState("");
+    const [pomoTopic, setPomoTopic] = useState("");
+    const [completedModal, setCompletedModal] = useState(null);
+    const [quizData, setQuizData] = useState(null);
+    const [characterAnimState, setCharacterAnimState] = useState("idle");
+
+    // Forms state
+    const [authForm, setAuthForm] = useState({ username: "", password: "", confirm_password: "", date_of_birth: "", referral_code: "" });
+    const [forgotToken, setForgotToken] = useState("");
+    const [newPassword, setNewPassword] = useState("");
+    const [newPasswordConfirm, setNewPasswordConfirm] = useState("");
+    const [searchUserQuery, setSearchUserQuery] = useState("");
+    const [searchResults, setSearchResults] = useState([]);
+    const [shopTab, setShopTab] = useState("themes"); // themes, outfits, hats, glasses, accessories
+    const [charNameInput, setCharNameInput] = useState("");
+    const [showNameModal, setShowNameModal] = useState(false);
+    const [showAchievementModal, setShowAchievementModal] = useState(false);
+
+    // Planner state
     const [plans, setPlans] = useState([]);
     const [selectedPlan, setSelectedPlan] = useState(null);
-    const [aiLoading, setAiLoading] = useState(false);
+    const [plannerLoading, setPlannerLoading] = useState(false);
+    const [plannerForm, setPlannerForm] = useState({
+        goal_title: "",
+        target_date: "",
+        daily_hours: 2.0,
+        topics: ""
+    });
 
-    const [inspectedProfile, setInspectedProfile] = useState(null);
-
-    const [ambientType, setAmbientType] = useState("none");
-    const [ambientVol, setAmbientVol] = useState(0.35);
-
-    const [pomoTargetMins, setPomoTargetMins] = useState(25);
-    const [pomoTopic, setPomoTopic] = useState("");
-    const [pomoRemainingSec, setPomoRemainingSec] = useState(25 * 60);
-    const [pomoSessionId, setPomoSessionId] = useState(null);
-    const [pomoPaused, setPomoPaused] = useState(false);
-
-    const [quizModal, setQuizModal] = useState(null);
-
-    const t = (key) =>
-        (window.I18N_DICT && window.I18N_DICT[lang] && window.I18N_DICT[lang][key]) ||
-        (EXTRA_I18N[lang] && EXTRA_I18N[lang][key]) ||
-        key;
+    const t = (key) => (window.I18N_DICT && window.I18N_DICT[lang] && window.I18N_DICT[lang][key]) || key;
 
     const notify = (msg, type = "success") => {
         setToast({ msg, type });
-        setTimeout(() => setToast(null), 4200);
+        setTimeout(() => setToast(null), 3800);
     };
 
     useEffect(() => {
@@ -679,22 +871,7 @@ function App() {
         document.documentElement.dir = lang === "fa" ? "rtl" : "ltr";
     }, [lang]);
 
-    useEffect(() => {
-        localStorage.setItem("studymate_color_mode", darkMode ? "dark" : "light");
-        document.documentElement.classList.toggle("dark", darkMode);
-    }, [darkMode]);
-
-    const handleAmbientChange = (type) => {
-        setAmbientType(type);
-        ambientEngine.play(type);
-    };
-
-    const handleVolumeChange = (v) => {
-        const val = parseFloat(v);
-        setAmbientVol(val);
-        ambientEngine.setVolume(val);
-    };
-
+    // API Helper
     const api = async (endpoint, options = {}) => {
         const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
         if (token) headers["Authorization"] = `Bearer ${token}`;
@@ -702,6 +879,8 @@ function App() {
         const data = await res.json().catch(() => ({}));
         if (res.status === 401) {
             setShowAuthModal(true);
+            setToken("");
+            localStorage.removeItem("studymate_token");
             throw new Error(data.detail || "Unauthorized");
         }
         if (!res.ok) {
@@ -710,1279 +889,2351 @@ function App() {
         return data;
     };
 
-    const openUserProfile = async (userId) => {
-        if (!userId) return;
+    const fetchAllData = async () => {
+        if (!token) return;
         try {
-            const prof = await api(`/users/${userId}/profile`);
-            setInspectedProfile(prof);
+            const [u, st, ch, crs, thm, acc, fr, frReq, lb, hm, ref, plns, sess] = await Promise.all([
+                api("/users/me"),
+                api("/dashboard/stats"),
+                api("/challenges/weekly").catch(() => null),
+                api("/courses").catch(() => []),
+                api("/shop/themes").catch(() => []),
+                api("/shop/accessories").catch(() => []),
+                api("/friends").catch(() => []),
+                api("/friends/requests").catch(() => []),
+                api("/leaderboard").catch(() => []),
+                api("/dashboard/heatmap").catch(() => []),
+                api("/referrals/me").catch(() => null),
+                api("/ai/plans").catch(() => []),
+                api("/sessions").catch(() => [])
+            ]);
+            setUser(u);
+            setStats(st);
+            setWeeklyChallenge(ch);
+            setCourses(crs);
+            setThemes(thm);
+            setAccessories(acc);
+            setFriends(fr);
+            setFriendRequests(frReq);
+            setLeaderboard(lb);
+            setHeatmap(hm);
+            setReferralInfo(ref);
+            setPlans(plns || []);
+            setSessions(sess || []);
+            setCharNameInput(u.character_name || "Minti");
+            const activeThm = u.active_theme || "default";
+            document.documentElement.setAttribute("data-user-theme", activeThm);
+            localStorage.setItem("studymate_active_theme", activeThm);
+        } catch (err) {
+            console.error("Fetch error:", err);
+        }
+    };
+
+    const handleSelectPlan = async (planId) => {
+        try {
+            const detail = await api(`/ai/plans/${planId}`);
+            setSelectedPlan(detail);
         } catch (err) {
             notify(err.message, "error");
         }
     };
 
-    const refreshAll = async () => {
-        if (!token) return;
+    const handleGeneratePlan = async (e) => {
+        e.preventDefault();
+        setPlannerLoading(true);
         try {
-            const [st, crs, sss, thm, hmap] = await Promise.all([
-                api("/dashboard/stats"),
-                api("/courses"),
-                api("/sessions"),
-                api("/shop/themes"),
-                api("/dashboard/heatmap").catch(() => [])
-            ]);
-            setStats(st);
-            setCourses(crs);
-            setSessions(sss);
-            setThemes(thm);
-            setHeatmap(hmap);
-            document.documentElement.setAttribute("data-user-theme", st.active_theme || "default");
+            const topicsList = plannerForm.topics.split(/[,،\n]+/).map(t => t.trim()).filter(Boolean);
+            const res = await api("/ai/generate-plan", {
+                method: "POST",
+                body: JSON.stringify({
+                    goal_title: plannerForm.goal_title,
+                    target_date: plannerForm.target_date,
+                    daily_hours: parseFloat(plannerForm.daily_hours) || 2.0,
+                    topics: topicsList.length ? topicsList : ["General Review"],
+                    lang: lang
+                })
+            });
+            notify("نقشه راه درسی توسط هوش مصنوعی با موفقیت ساخته شد!", "success");
+            setSelectedPlan(res);
+            api("/ai/plans").then(setPlans).catch(() => {});
         } catch (err) {
-            console.error(err);
+            notify(err.message, "error");
+        } finally {
+            setPlannerLoading(false);
+        }
+    };
+
+    const handleTogglePlanDay = async (planId, dayNum) => {
+        try {
+            const res = await api(`/ai/plans/${planId}/days/${dayNum}/toggle`, { method: "POST" });
+            notify(res.message, "success");
+            const updated = await api(`/ai/plans/${planId}`);
+            setSelectedPlan(updated);
+        } catch (err) {
+            notify(err.message, "error");
         }
     };
 
     useEffect(() => {
         if (token) {
-            refreshAll();
-            loadAIPlans();
-            loadArenaData(lbTimeframe);
+            fetchAllData();
+            setShowAuthModal(false);
         }
     }, [token]);
 
-    const loadAIPlans = async () => {
-        if (!token) return;
-        try {
-            const list = await api("/ai/plans");
-            setPlans(list);
-            if (list.length > 0 && !selectedPlan) {
-                const detail = await api(`/ai/plans/${list[0].id}`);
-                setSelectedPlan(detail);
-            }
-        } catch (e) {}
-    };
-
-    const loadArenaData = async (tf = "all_time") => {
-        const targetTf = typeof tf === "string" ? tf : lbTimeframe;
-        setLbTimeframe(targetTf);
-        try {
-            const lb = await api(`/leaderboard?timeframe=${targetTf}`);
-            setLeaderboard(lb);
-            if (token) {
-                const myG = await api("/groups/my");
-                const fullG = await Promise.all(myG.map(g => api(`/groups/${g.id}`)));
-                setGroups(fullG);
-
-                const raidsMap = {};
-                await Promise.all(
-                    fullG.map(async (g) => {
-                        const rList = await api(`/groups/${g.id}/raids`).catch(() => []);
-                        raidsMap[g.id] = rList;
-                    })
-                );
-                setGroupRaids(raidsMap);
-            }
-        } catch (e) {}
-    };
-
+    // Timer Interval
     useEffect(() => {
-        if (!pomoSessionId || pomoPaused) return;
-        const timer = setInterval(() => {
-            setPomoRemainingSec((prev) => {
-                if (prev <= 1) {
-                    clearInterval(timer);
-                    handleCompletePomodoro(pomoSessionId);
-                    return 0;
-                }
-                return prev - 1;
-            });
-        }, 1000);
-        return () => clearInterval(timer);
-    }, [pomoSessionId, pomoPaused]);
+        let interval = null;
+        if (timerRunning && !timerPaused && remainingSec > 0) {
+            interval = setInterval(() => {
+                setRemainingSec(prev => prev - 1);
+            }, 1000);
+        } else if (remainingSec === 0 && timerRunning) {
+            handleCompleteSession();
+        }
+        return () => clearInterval(interval);
+    }, [timerRunning, timerPaused, remainingSec]);
 
-    const handleStartPomodoro = async () => {
+    const handleStartTimer = async (mins) => {
         try {
-            const res = await api("/pomodoro/start", {
+            const duration = mins || targetMins;
+            setTargetMins(duration);
+            setRemainingSec(duration * 60);
+            const sess = await api("/pomodoro/start", {
                 method: "POST",
-                body: JSON.stringify({
-                    topic: pomoTopic.trim() || (lang === "fa" ? "تمرکز عمیق" : "Deep Focus"),
-                    target_minutes: pomoTargetMins
-                })
+                body: JSON.stringify({ topic: pomoTopic || "General Study", target_minutes: duration })
             });
-            setPomoRemainingSec(pomoTargetMins * 60);
-            setPomoSessionId(res.id);
-            setPomoPaused(false);
+            setActivePomoId(sess.id);
+            setTimerRunning(true);
+            setTimerPaused(false);
+            setCharacterAnimState("study");
+            notify("جلسه مطالعه شروع شد! تمرکزت رو حفظ کن.", "success");
         } catch (err) {
             notify(err.message, "error");
         }
     };
 
-    const handleCompletePomodoro = async (sid) => {
-        try {
-            const res = await api(`/pomodoro/${sid}/complete`, { method: "POST" });
-            playSynthChime();
-            spawnParticleBurst(window.innerWidth / 2, window.innerHeight / 2);
-            const bonusText = res.streak_bonus_coins > 0
-                ? ` + ${res.streak_bonus_coins} 🔥 Streak Bonus!`
-                : "";
-            notify(`+${res.coins_earned} 🪙 Coins Earned!${bonusText}`);
-            setPomoSessionId(null);
-            setPomoRemainingSec(pomoTargetMins * 60);
-            refreshAll();
-            loadArenaData(lbTimeframe);
+    const handlePauseResume = () => {
+        setTimerPaused(prev => !prev);
+    };
 
-            try {
-                const qList = await api(`/pomodoro/${sid}/quiz?lang=${lang}`);
-                if (Array.isArray(qList) && qList.length > 0) {
-                    setQuizModal({ sessionId: sid, questions: qList, selected: {} });
-                }
-            } catch (qe) {}
+    const handleCompleteSession = async () => {
+        if (!activePomoId) return;
+        try {
+            const res = await api(`/pomodoro/${activePomoId}/complete`, { method: "POST" });
+            setTimerRunning(false);
+            setActivePomoId(null);
+            setCharacterAnimState("completed");
+            setCompletedModal(res);
+            notify(`آفرین! +${res.xp_earned} XP و +${res.coins_earned} سکه دریافت کردی! 🎉`, "success");
+            fetchAllData();
+
+            // Load optional quiz
+            api(`/pomodoro/${activePomoId}/quiz?lang=${lang}`).then(q => setQuizData(q)).catch(() => {});
         } catch (err) {
             notify(err.message, "error");
-            setPomoSessionId(null);
-            setPomoRemainingSec(pomoTargetMins * 60);
         }
     };
 
-    const handleClaimQuizBonus = async () => {
-        if (!quizModal) return;
-        const correctIndices = [];
-        quizModal.questions.forEach((q, idx) => {
-            if (quizModal.selected[idx] === q.correct_index) {
-                correctIndices.push(idx);
-            }
-        });
-
-        if (correctIndices.length === 0) {
-            notify(lang === "fa" ? "پاسخ صحیحی ثبت نشد!" : "No correct answers!", "error");
-            setQuizModal(null);
-            return;
-        }
-
+    const handleAbandonSession = async () => {
+        if (!activePomoId) return;
         try {
-            const res = await api(`/pomodoro/${quizModal.sessionId}/quiz/claim`, {
-                method: "POST",
-                body: JSON.stringify({ answers: correctIndices })
-            });
-            playSynthChime();
-            notify(res.message);
-            setQuizModal(null);
-            refreshAll();
+            await api(`/pomodoro/${activePomoId}/abandon`, { method: "POST" });
+            setTimerRunning(false);
+            setActivePomoId(null);
+            setRemainingSec(targetMins * 60);
+            setCharacterAnimState("idle");
+            notify("جلسه لغو شد.", "warning");
         } catch (err) {
             notify(err.message, "error");
-            setQuizModal(null);
         }
     };
 
-    const handleAbandonPomodoro = async () => {
-        if (!pomoSessionId) return;
-        try {
-            await api(`/pomodoro/${pomoSessionId}/abandon`, { method: "POST" });
-            notify(lang === "fa" ? "جلسه لغو شد (۰ سکه)." : "Session abandoned (0 coins).", "error");
-        } catch (e) {}
-        setPomoSessionId(null);
-        setPomoPaused(false);
-        setPomoRemainingSec(pomoTargetMins * 60);
-        refreshAll();
-    };
-
-    const handleAuth = async (e) => {
+    // Auth Handlers
+    const handleRegister = async (e) => {
         e.preventDefault();
-        const form = new FormData(e.target);
-        const payload = Object.fromEntries(form.entries());
         try {
-            const ep = authMode === "register" ? "/auth/register" : "/auth/login";
-            const res = await api(ep, { method: "POST", body: JSON.stringify(payload) });
+            const res = await api("/auth/register", {
+                method: "POST",
+                body: JSON.stringify(authForm)
+            });
             localStorage.setItem("studymate_token", res.access_token);
             setToken(res.access_token);
             setShowAuthModal(false);
-            notify(lang === "fa" ? "خوش آمدید!" : "Welcome aboard!");
+            notify("به StudyMate خوش اومدی! اکانت شما ساخته شد.", "success");
         } catch (err) {
             notify(err.message, "error");
         }
     };
 
-    const activeThemeObj = themes.find(th => th.id === (stats?.active_theme || "default"));
-
-    // پیدا کردن اولین باس فعال کاربر در گروه‌ها برای نمایش در سکشن Hero
-    let firstActiveRaid = null;
-    Object.values(groupRaids).forEach(rList => {
-        if (Array.isArray(rList)) {
-            const found = rList.find(r => r.status === "active");
-            if (found && !firstActiveRaid) firstActiveRaid = found;
+    const handleLogin = async (e) => {
+        e.preventDefault();
+        try {
+            const res = await api("/auth/login", {
+                method: "POST",
+                body: JSON.stringify({ username: authForm.username, password: authForm.password })
+            });
+            localStorage.setItem("studymate_token", res.access_token);
+            setToken(res.access_token);
+            setShowAuthModal(false);
+            notify("خوش آمدید!", "success");
+        } catch (err) {
+            notify(err.message, "error");
         }
-    });
+    };
+
+    const handleForgotPassword = async (e) => {
+        e.preventDefault();
+        try {
+            const res = await api("/auth/forgot-password", {
+                method: "POST",
+                body: JSON.stringify({ username_or_email: authForm.username })
+            });
+            if (res.reset_token) {
+                setForgotToken(res.reset_token);
+                notify(`کد بازیابی صادر شد: ${res.reset_token}`, "info");
+            }
+        } catch (err) {
+            notify(err.message, "error");
+        }
+    };
+
+    const handleResetPassword = async (e) => {
+        e.preventDefault();
+        try {
+            await api("/auth/reset-password", {
+                method: "POST",
+                body: JSON.stringify({
+                    token: forgotToken,
+                    new_password: newPassword,
+                    confirm_password: newPasswordConfirm
+                })
+            });
+            notify("رمز عبور با موفقیت تغییر یافت. اکنون وارد شوید.", "success");
+            setAuthMode("login");
+        } catch (err) {
+            notify(err.message, "error");
+        }
+    };
+
+    // Customization & Shop Handlers
+    const handleBuyTheme = async (themeId) => {
+        try {
+            await api("/shop/buy", { method: "POST", body: JSON.stringify({ theme_id: themeId }) });
+            await api("/shop/equip", { method: "POST", body: JSON.stringify({ theme_id: themeId }) });
+            document.documentElement.setAttribute("data-user-theme", themeId);
+            localStorage.setItem("studymate_active_theme", themeId);
+            setPreviewTheme(null);
+            notify("تم با موفقیت خریداری و فعال شد! ✨", "success");
+            setCharacterAnimState("happy");
+            setTimeout(() => setCharacterAnimState("idle"), 3000);
+            fetchAllData();
+        } catch (err) {
+            notify(err.message, "error");
+        }
+    };
+
+    const handleEquipTheme = async (themeId) => {
+        try {
+            await api("/shop/equip", { method: "POST", body: JSON.stringify({ theme_id: themeId }) });
+            document.documentElement.setAttribute("data-user-theme", themeId);
+            localStorage.setItem("studymate_active_theme", themeId);
+            setPreviewTheme(null);
+            notify("تم فعال شد!", "success");
+            fetchAllData();
+        } catch (err) {
+            notify(err.message, "error");
+        }
+    };
+
+    const handlePreviewTheme = (themeId) => {
+        document.documentElement.setAttribute("data-user-theme", themeId);
+        setPreviewTheme(themeId);
+    };
+
+    const handleCancelThemePreview = () => {
+        const activeThm = user ? user.active_theme : "default";
+        document.documentElement.setAttribute("data-user-theme", activeThm);
+        setPreviewTheme(null);
+    };
+
+    const handleTryOn = (item) => {
+        setPreviewItem(item);
+        setCharacterAnimState("welcome");
+        setTimeout(() => setCharacterAnimState("idle"), 2500);
+    };
+
+    const handleCancelPreview = () => {
+        setPreviewItem(null);
+        setCharacterAnimState("idle");
+    };
+
+    const handleBuyAccessory = async (item) => {
+        try {
+            await api("/shop/accessories/buy", {
+                method: "POST",
+                body: JSON.stringify({ item_id: item.id, category: item.category })
+            });
+            await api("/shop/accessories/equip", {
+                method: "POST",
+                body: JSON.stringify({ item_id: item.id, category: item.category })
+            });
+            setPreviewItem(null);
+            notify(`${item.name_fa} با موفقیت خریداری و تجهیز شد! ✨`, "success");
+            setCharacterAnimState("happy");
+            setTimeout(() => setCharacterAnimState("idle"), 3500);
+            fetchAllData();
+        } catch (err) {
+            notify(err.message, "error");
+        }
+    };
+
+    const handleEquipAccessory = async (item) => {
+        try {
+            await api("/shop/accessories/equip", {
+                method: "POST",
+                body: JSON.stringify({ item_id: item.id, category: item.category })
+            });
+            setPreviewItem(null);
+            notify(`${item.name_fa} تجهیز شد!`, "success");
+            setCharacterAnimState("happy");
+            setTimeout(() => setCharacterAnimState("idle"), 2500);
+            fetchAllData();
+        } catch (err) {
+            notify(err.message, "error");
+        }
+    };
+
+    const handleSaveCharacterName = async () => {
+        try {
+            await api("/character/name", {
+                method: "PATCH",
+                body: JSON.stringify({ character_name: charNameInput })
+            });
+            setShowNameModal(false);
+            notify("نام دوست دیجیتال تغییر یافت!", "success");
+            fetchAllData();
+        } catch (err) {
+            notify(err.message, "error");
+        }
+    };
+
+    // Search & Friend Handlers
+    const handleSearchUsers = async (q) => {
+        setSearchUserQuery(q);
+        if (q.trim().length >= 2) {
+            try {
+                const results = await api(`/users/search?q=${encodeURIComponent(q)}`);
+                setSearchResults(results);
+            } catch (err) {}
+        } else {
+            setSearchResults([]);
+        }
+    };
+
+    const handleFriendAction = async (action, targetId, reqId) => {
+        try {
+            const res = await api("/friends/action", {
+                method: "POST",
+                body: JSON.stringify({ action, target_username_or_id: String(targetId || ""), request_id: reqId })
+            });
+            notify(res.message, "success");
+            fetchAllData();
+        } catch (err) {
+            notify(err.message, "error");
+        }
+    };
+
+    const formatTime = (totalSec) => {
+        const m = Math.floor(totalSec / 60);
+        const s = totalSec % 60;
+        return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    };
 
     return (
-        <div className="min-h-screen flex flex-col lg:flex-row relative z-10">
-            <AmbientEmbers />
-
+        <div className="flex h-screen overflow-hidden bg-[#FCF8F8] text-[#2D2525]">
+            {/* Toast Notification */}
             {toast && (
-                <div className={`fixed bottom-6 right-6 z-50 px-5 py-3.5 rounded-2xl shadow-2xl border font-bold text-sm flex items-center gap-3 ${toast.type === 'error' ? 'bg-red-950/95 border-red-500 text-red-200' : 'bg-zinc-900/95 border-accent text-white'}`}>
-                    <span>{toast.type === "error" ? "⚠️" : "⚡"}</span>
+                <div className={`fixed top-5 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-2xl shadow-lg font-bold text-sm flex items-center gap-2 border transition-all ${
+                    toast.type === "error" ? "bg-rose-50 text-rose-700 border-rose-200" :
+                    toast.type === "warning" ? "bg-amber-50 text-amber-700 border-amber-200" :
+                    "bg-[#FBEFEF] text-[#2D2525] border-[#F5AFAF]"
+                }`}>
                     <span>{toast.msg}</span>
                 </div>
             )}
 
-            {/* PUBLIC USER PROFILE POPUP MODAL (RPG CHARACTER SHEET) */}
-            {inspectedProfile && (
-                <div
-                    onClick={() => setInspectedProfile(null)}
-                    className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4"
-                >
-                    <div
-                        onClick={(e) => e.stopPropagation()}
-                        className={`w-full max-w-md rounded-3xl p-6 sm:p-8 text-white shadow-2xl space-y-6 relative overflow-hidden aura-${inspectedProfile.active_theme || 'default'}`}
-                    >
-                        <div className="flex items-start justify-between">
-                            <div>
-                                <span className="text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full bg-black/50 border border-white/20">
-                                    {inspectedProfile.rarity} • {lang === "fa" ? inspectedProfile.theme_name_fa : inspectedProfile.theme_name}
-                                </span>
-                                <h2 className="text-3xl font-black mt-3 flex items-center gap-2">
-                                    <span>{inspectedProfile.username}</span>
-                                </h2>
-                                <div className="flex flex-wrap items-center gap-2 mt-2">
-                                    <span className="px-2.5 py-0.5 rounded-lg metallic-gold-badge text-xs">
-                                        LVL {inspectedProfile.level}
-                                    </span>
-                                    <span className="px-2.5 py-0.5 rounded-lg metallic-platinum-badge text-xs">
-                                        {lang === "fa" ? inspectedProfile.title_fa : inspectedProfile.title}
-                                    </span>
-                                </div>
-                            </div>
-                            <button
-                                onClick={() => setInspectedProfile(null)}
-                                className="w-8 h-8 rounded-full bg-black/40 hover:bg-black/70 flex items-center justify-center text-sm font-bold"
-                            >
-                                ✕
-                            </button>
+            {/* Sidebar Navigation */}
+            <aside className="hidden md:flex flex-col w-64 bg-[#FBEFEF] border-e border-[#F9DFDF] p-6 justify-between select-none">
+                <div className="space-y-6">
+                    {/* Logo & Brand */}
+                    <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 rounded-2xl bg-[#F5AFAF] flex items-center justify-center shadow-md">
+                            <span className="text-2xl">🌱</span>
                         </div>
-
-                        <div className="bg-black/40 p-3.5 rounded-2xl space-y-1.5 border border-white/10 backdrop-blur-sm">
-                            <div className="flex justify-between text-xs font-bold">
-                                <span className="text-cyan-300">HUD XP</span>
-                                <span>{inspectedProfile.xp} / {inspectedProfile.next_level_xp} XP</span>
-                            </div>
-                            <div className="w-full h-2.5 bg-black/60 rounded-full overflow-hidden">
-                                <div
-                                    className="h-full bg-gradient-to-r from-violet-500 via-cyan-400 to-amber-300 rounded-full"
-                                    style={{ width: `${Math.min(100, (inspectedProfile.xp / (inspectedProfile.next_level_xp || 150)) * 100)}%` }}
-                                ></div>
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="bg-black/40 border border-white/10 p-3.5 rounded-2xl text-center">
-                                <span className="text-xl font-black text-amber-300 block">{inspectedProfile.coins} 🪙</span>
-                                <span className="text-[11px] opacity-80">{t("coins_unit")}</span>
-                            </div>
-                            <div className="bg-black/40 border border-white/10 p-3.5 rounded-2xl text-center">
-                                <span className="text-xl font-black text-orange-400 block">{inspectedProfile.current_streak} 🔥</span>
-                                <span className="text-[11px] opacity-80">{t("day_label")}</span>
-                            </div>
-                            <div className="bg-black/40 border border-white/10 p-3.5 rounded-2xl text-center">
-                                <span className="text-xl font-black text-emerald-300 block">{inspectedProfile.total_study_hours} {t("hours_short")}</span>
-                                <span className="text-[11px] opacity-80">{t("profile_pomos")}: {inspectedProfile.total_pomodoros} 🍅</span>
-                            </div>
-                            <div className="bg-black/40 border border-white/10 p-3.5 rounded-2xl text-center">
-                                <span className="text-xl font-black text-red-400 block">{inspectedProfile.total_raid_damage} ⚔️</span>
-                                <span className="text-[11px] opacity-80">{t("profile_raid_dmg")}</span>
-                            </div>
-                        </div>
-
-                        <div className="flex items-center justify-between text-[11px] opacity-80 pt-2 border-t border-white/15">
-                            <span>{t("profile_member_since")}: {inspectedProfile.created_at}</span>
-                            <button
-                                onClick={() => setInspectedProfile(null)}
-                                className="px-4 py-1.5 rounded-xl bg-white/20 hover:bg-white/30 font-bold text-white transition"
-                            >
-                                {t("close_btn")}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Post-Pomodoro AI Quiz Modal */}
-            {quizModal && (
-                <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-                    <div className="bento-card rim-light-ai w-full max-w-lg p-6 sm:p-8 space-y-5">
                         <div>
-                            <h2 className="text-xl font-black text-accent">{t("quiz_modal_title")}</h2>
-                            <p className="text-xs text-slate-400 mt-1">{t("quiz_modal_sub")}</p>
-                        </div>
-
-                        <div className="space-y-4 max-h-96 overflow-y-auto pr-1">
-                            {quizModal.questions.map((q, qIdx) => (
-                                <div key={qIdx} className="p-4 rounded-xl bg-elevated border border-slate-700/50 space-y-2.5">
-                                    <p className="text-xs font-bold">{qIdx + 1}. {q.question}</p>
-                                    <div className="grid grid-cols-1 gap-2">
-                                        {q.options.map((opt, oIdx) => {
-                                            const isSelected = quizModal.selected[qIdx] === oIdx;
-                                            return (
-                                                <button
-                                                    key={oIdx}
-                                                    type="button"
-                                                    onClick={() =>
-                                                        setQuizModal(prev => ({
-                                                            ...prev,
-                                                            selected: { ...prev.selected, [qIdx]: oIdx }
-                                                        }))
-                                                    }
-                                                    className={`text-start px-3.5 py-2.5 rounded-lg text-xs font-semibold border transition ${isSelected ? "border-accent bg-indigo-500/20 text-white" : "border-slate-700/50 hover:border-slate-500"}`}
-                                                >
-                                                    {opt}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-
-                        <div className="flex gap-3 pt-2">
-                            <button onClick={handleClaimQuizBonus} className="flex-1 tactile-btn py-3 rounded-xl text-xs">
-                                {t("quiz_claim_btn")}
-                            </button>
-                            <button onClick={() => setQuizModal(null)} className="px-4 py-3 rounded-xl bg-elevated text-slate-400 text-xs font-bold">
-                                {t("quiz_skip_btn")}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Auth Modal */}
-            {showAuthModal && (
-                <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
-                    <div className="bento-card rim-light-ai w-full max-w-md p-7 space-y-6">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <h2 className="text-2xl font-black font-display">Study<span className="text-accent">Mate</span> Neo-RPG</h2>
-                                <p className="text-xs text-slate-400 mt-0.5">{t("app_subtitle")}</p>
-                            </div>
-                            <button onClick={() => setLang(lang === "fa" ? "en" : "fa")} className="px-3 py-1.5 rounded-xl border border-slate-700 text-xs font-bold">
-                                {lang === "fa" ? "EN" : "FA"}
-                            </button>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-elevated">
-                            <button onClick={() => setAuthMode("login")} className={`py-2.5 rounded-lg text-xs font-bold transition ${authMode === "login" ? "tactile-btn" : "text-slate-400"}`}>
-                                {t("auth_login_tab")}
-                            </button>
-                            <button onClick={() => setAuthMode("register")} className={`py-2.5 rounded-lg text-xs font-bold transition ${authMode === "register" ? "tactile-btn" : "text-slate-400"}`}>
-                                {t("auth_register_tab")}
-                            </button>
-                        </div>
-
-                        <form onSubmit={handleAuth} className="space-y-4">
-                            <div>
-                                <label className="block text-xs font-bold text-slate-400 mb-1">{t("username")}</label>
-                                <input name="username" required minLength={3} className="w-full px-4 py-3 rounded-xl bg-elevated border border-slate-700/60 focus:outline-none focus:border-accent text-sm" />
-                            </div>
-                            {authMode === "register" && (
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-400 mb-1">{t("email")}</label>
-                                    <input name="email" type="email" required className="w-full px-4 py-3 rounded-xl bg-elevated border border-slate-700/60 focus:outline-none focus:border-accent text-sm" />
-                                </div>
-                            )}
-                            <div>
-                                <label className="block text-xs font-bold text-slate-400 mb-1">{t("password")}</label>
-                                <input name="password" type="password" required minLength={6} className="w-full px-4 py-3 rounded-xl bg-elevated border border-slate-700/60 focus:outline-none focus:border-accent text-sm" />
-                            </div>
-                            <button type="submit" className="w-full tactile-btn py-3.5 rounded-xl text-sm">
-                                {authMode === "login" ? t("login_cta") : t("register_cta")}
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {/* Tactical Neo-RPG Sidebar */}
-            <aside className="lg:w-76 shrink-0 border-b lg:border-b-0 lg:border-e border-white/10 bg-zinc-950/80 backdrop-blur-2xl p-5 flex flex-col justify-between gap-6">
-                <div className="space-y-5">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl tactile-btn flex items-center justify-center font-display font-black text-xl">S</div>
-                            <div>
-                                <h1 className="font-display font-black text-lg leading-none">Study<span className="text-accent">Mate</span></h1>
-                                <span className="text-[10px] text-cyan-400 font-bold tracking-wider uppercase">Cyber-SaaS RPG</span>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                            <button onClick={() => setLang(lang === "fa" ? "en" : "fa")} className="px-2.5 py-1.5 rounded-lg border border-white/10 text-xs font-bold hover:border-accent">
-                                {lang === "fa" ? "EN" : "FA"}
-                            </button>
-                            <button onClick={() => setDarkMode(!darkMode)} className="px-2.5 py-1.5 rounded-lg border border-white/10 text-xs">
-                                {darkMode ? "☀️" : "🌙"}
-                            </button>
+                            <h1 className="text-xl font-black text-[#2D2525] tracking-tight">{t("app_title")}</h1>
+                            <p className="text-xs text-[#8C7777] font-medium">{t("app_slogan")}</p>
                         </div>
                     </div>
 
-                    {/* 3D Tilt Gamer Profile Card */}
-                    {stats && (
-                        <HolographicRPGCard
-                            stats={stats}
-                            activeThemeObj={activeThemeObj}
-                            lang={lang}
-                            t={t}
-                            onClick={() => openUserProfile(stats.user_id)}
-                        ></HolographicRPGCard>
-                    )}
-
-                    <nav className="flex lg:flex-col gap-1.5 overflow-x-auto">
+                    {/* Navigation Links */}
+                    <nav className="space-y-1.5 pt-4">
                         {[
-                            { id: "dashboard", label: t("nav_dashboard"), icon: "⚡" },
-                            { id: "pomodoro", label: t("nav_pomodoro"), icon: "⚔️" },
-                            { id: "ai", label: t("nav_ai"), icon: "📜" },
-                            { id: "shop", label: t("nav_shop"), icon: "🔮" },
-                            { id: "arena", label: t("nav_arena"), icon: "🏆" }
+                            { id: "dashboard", icon: "🏠", label: t("nav_dashboard") },
+                            { id: "study", icon: "⏱️", label: t("nav_study") },
+                            { id: "planner", icon: "📅", label: t("nav_planner") },
+                            { id: "friends", icon: "👥", label: t("nav_friends") },
+                            { id: "challenges", icon: "⚔️", label: t("nav_challenges") },
+                            { id: "shop", icon: "🛍️", label: t("nav_shop") },
+                            { id: "reports", icon: "📊", label: t("nav_reports") },
+                            { id: "leaderboard", icon: "🏆", label: t("nav_leaderboard") },
+                            { id: "referrals", icon: "🎁", label: t("nav_referrals") }
                         ].map(item => (
                             <button
                                 key={item.id}
                                 onClick={() => setActiveTab(item.id)}
-                                className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold whitespace-nowrap transition ${activeTab === item.id ? "tactile-btn" : "text-slate-400 hover:bg-white/5"}`}
+                                className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl font-bold text-sm transition-all ${
+                                    activeTab === item.id
+                                        ? "bg-[#F5AFAF] text-[#2D2525] shadow-sm translate-x-1"
+                                        : "text-[#5A4A4A] hover:bg-[#F9DFDF] hover:text-[#2D2525]"
+                                }`}
                             >
-                                <span>{item.icon}</span>
+                                <span className="text-lg">{item.icon}</span>
                                 <span>{item.label}</span>
                             </button>
                         ))}
                     </nav>
-
-                    <div className="p-3.5 rounded-2xl bg-elevated border border-white/10 space-y-2.5">
-                        <span className="text-[11px] font-black text-slate-300 block">🎧 {t("ambient_player_title")}</span>
-                        <div className="grid grid-cols-2 gap-1.5">
-                            {[
-                                { id: "none", label: t("sound_none") },
-                                { id: "rain", label: t("sound_rain") },
-                                { id: "whitenoise", label: t("sound_whitenoise") },
-                                { id: "lofidrone", label: t("sound_lofidrone") }
-                            ].map(snd => (
-                                <button
-                                    key={snd.id}
-                                    onClick={() => handleAmbientChange(snd.id)}
-                                    className={`py-1.5 px-2 rounded-lg text-[10px] font-bold transition ${ambientType === snd.id ? "tactile-btn" : "bg-black/30 text-slate-400 hover:text-white"}`}
-                                >
-                                    {snd.label}
-                                </button>
-                            ))}
-                        </div>
-                        {ambientType !== "none" && (
-                            <input
-                                type="range"
-                                min="0.05"
-                                max="0.8"
-                                step="0.05"
-                                value={ambientVol}
-                                onChange={(e) => handleVolumeChange(e.target.value)}
-                                className="w-full accent-violet-500 h-1 cursor-pointer"
-                            />
-                        )}
-                    </div>
                 </div>
 
-                {stats && (
-                    <button
-                        onClick={() => {
-                            localStorage.removeItem("studymate_token");
-                            window.location.reload();
-                        }}
-                        className="w-full py-2.5 rounded-xl border border-red-500/30 text-red-400 hover:bg-red-500/10 text-xs font-bold transition"
-                    >
-                        {t("logout")}
-                    </button>
+                {/* Companion Small Card in Sidebar */}
+                {user && (
+                    <div className="p-4 rounded-3xl bg-white border border-[#F9DFDF] shadow-sm text-center">
+                        <div className="h-28">
+                            <MintiCharacter3D
+                                state={characterAnimState}
+                                equippedHat={user.equipped_hat}
+                                equippedGlasses={user.equipped_glasses}
+                                equippedOutfit={user.equipped_outfit}
+                                equippedAccessory={user.equipped_accessory}
+                                equippedJewelry={user.equipped_jewelry}
+                                size="sm"
+                            />
+                        </div>
+                        <div className="flex items-center justify-center gap-1.5 mt-1">
+                            <span className="font-extrabold text-sm text-[#2D2525]">{user.character_name || "Minti"}</span>
+                            <button onClick={() => setShowNameModal(true)} className="text-xs text-[#8C7777] hover:text-[#2D2525]">✏️</button>
+                        </div>
+                        <p className="text-[11px] text-[#8C7777]">{t("minti_desc")}</p>
+                    </div>
                 )}
             </aside>
 
-            {/* Main Viewport */}
-            <main className="flex-1 p-4 sm:p-8 max-w-6xl mx-auto w-full space-y-6">
-                {activeTab === "dashboard" && stats && (
-                    <div className="space-y-6">
-                        {/* ۱. سکشن Hero با باس‌فایت زنده و دکمه Attack */}
-                        <LiveBossEncounterHero
-                            activeRaid={firstActiveRaid}
-                            lang={lang}
-                            t={t}
-                            onEngagePomodoro={() => setActiveTab("pomodoro")}
-                        ></LiveBossEncounterHero>
+            {/* Main Content Area */}
+            <div className="flex-1 flex flex-col h-screen overflow-hidden">
+                {/* Header */}
+                <header className="h-20 bg-[#FCF8F8] border-b border-[#FBEFEF] px-6 sm:px-10 flex items-center justify-between">
+                    <div>
+                        <h2 className="text-lg sm:text-xl font-black text-[#2D2525]">
+                            {t("greeting_prefix")} {user ? user.username : ""}!
+                        </h2>
+                        <p className="text-xs text-[#8C7777]">{t("greeting_quote")}</p>
+                    </div>
 
-                        {/* ۲. چرخه پاداش استریک ۷ روزه */}
-                        <div className="bento-card p-6 space-y-4">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                                <div>
-                                    <h2 className="text-lg font-black">{t("streak_track_title")}</h2>
-                                    <p className="text-xs text-slate-400">{t("streak_track_sub")}</p>
+                    <div className="flex items-center gap-3 sm:gap-4">
+                        {/* Language Toggle */}
+                        <div className="flex items-center bg-[#FBEFEF] rounded-2xl p-1 border border-[#F9DFDF]">
+                            <button
+                                onClick={() => setLang("fa")}
+                                className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all ${lang === "fa" ? "bg-[#F5AFAF] text-[#2D2525]" : "text-[#8C7777]"}`}
+                            >
+                                FA
+                            </button>
+                            <button
+                                onClick={() => setLang("en")}
+                                className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all ${lang === "en" ? "bg-[#F5AFAF] text-[#2D2525]" : "text-[#8C7777]"}`}
+                            >
+                                EN
+                            </button>
+                        </div>
+
+                        {/* User Badges */}
+                        {stats && (
+                            <div className="hidden sm:flex items-center gap-3">
+                                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-[#FBEFEF] border border-[#F9DFDF] text-xs font-black">
+                                    <span>🔥</span>
+                                    <span>{stats.current_streak} {t("streak_days")}</span>
                                 </div>
-                                <span className="text-xs font-bold px-3 py-1.5 rounded-xl bg-orange-500/10 border border-orange-500/30 text-orange-400">
-                                    {stats.streak_status === "active_today"
-                                        ? t("streak_done_today")
-                                        : `${t("streak_waiting")} +${stats.next_streak_reward} 🪙`}
-                                </span>
+                                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-[#FBEFEF] border border-[#F9DFDF] text-xs font-black">
+                                    <span>🪙</span>
+                                    <span>{stats.coins}</span>
+                                </div>
+                                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-[#F5AFAF] text-[#2D2525] text-xs font-black shadow-sm">
+                                    <span>Lv.{stats.level}</span>
+                                </div>
                             </div>
+                        )}
 
-                            <div className="grid grid-cols-7 gap-2 pt-2">
-                                {[1, 2, 3, 4, 5, 6, 7].map(dayNum => {
-                                    const reward = 10 + (dayNum - 1) * 5;
-                                    const isUnlocked = stats.current_streak >= dayNum;
-                                    const isCurrent = stats.current_streak === dayNum;
-                                    return (
-                                        <div
-                                            key={dayNum}
-                                            className={`p-3 rounded-xl border text-center transition ${isCurrent ? "border-orange-400 bg-orange-500/20 scale-105 shadow-lg" : isUnlocked ? "border-emerald-500/40 bg-emerald-500/10" : "border-white/5 bg-elevated opacity-60"}`}
-                                        >
-                                            <span className="text-[11px] font-bold block text-slate-400">{t("day_label")} {dayNum}</span>
-                                            <span className="text-base sm:text-lg font-black block my-1 text-amber-400">+{reward}</span>
-                                            <span className="text-[10px] block">{isUnlocked ? "🔥" : "🔒"}</span>
+                        {/* Auth / Profile Button */}
+                        {user ? (
+                            <button
+                                onClick={() => { localStorage.removeItem("studymate_token"); setToken(""); setShowAuthModal(true); }}
+                                className="w-10 h-10 rounded-2xl bg-[#FBEFEF] hover:bg-[#F9DFDF] border border-[#F9DFDF] flex items-center justify-center font-bold text-sm text-[#2D2525]"
+                                title={t("logout")}
+                            >
+                                🚪
+                            </button>
+                        ) : (
+                            <button
+                                onClick={() => setShowAuthModal(true)}
+                                className="sm-btn-primary text-xs"
+                            >
+                                {t("auth_login_btn")}
+                            </button>
+                        )}
+                    </div>
+                </header>
+
+                {/* Tab Views */}
+                <main className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-8">
+                    {/* 1. DASHBOARD VIEW (MATCHING REFERENCE IMAGE 2 TOP RIGHT) */}
+                    {activeTab === "dashboard" && (
+                        <div className="max-w-6xl mx-auto space-y-6">
+                            {/* Hero Grid */}
+                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                                {/* Left/Center Card: 3D Minti + Quick Focus Timer */}
+                                <div className="lg:col-span-8 bg-white rounded-3xl p-6 sm:p-8 border border-[#F9DFDF] shadow-card flex flex-col justify-between relative overflow-hidden">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <div className="flex items-center gap-2">
+                                            <span className="w-3 h-3 rounded-full bg-emerald-400 animate-pulse"></span>
+                                            <span className="text-xs font-bold text-[#8C7777]">{t("study_power_quote")}</span>
                                         </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-
-                        {/* ۳. کارت‌های HUD آمار (Bento Grid) */}
-                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                            <div className="bento-card p-5">
-                                <span className="text-xs text-slate-400 font-bold">{t("stat_today_study")}</span>
-                                <p className="text-2xl sm:text-3xl font-black text-accent mt-2 font-display">
-                                    {stats.today_study_hours} {t("hours_short")} <span className="text-xs text-slate-400">({stats.today_study_minutes} {t("mins_short")})</span>
-                                </p>
-                            </div>
-                            <div className="bento-card p-5">
-                                <span className="text-xs text-slate-400 font-bold">{t("stat_verified_pomo")}</span>
-                                <p className="text-2xl sm:text-3xl font-black text-emerald-400 mt-2 font-display">
-                                    {stats.today_pomodoro_count} <span className="text-xs text-slate-400">({stats.today_pomodoro_minutes} {t("mins_short")})</span>
-                                </p>
-                            </div>
-                            <div className="bento-card p-5">
-                                <span className="text-xs text-slate-400 font-bold">{t("stat_total_hours")}</span>
-                                <p className="text-2xl sm:text-3xl font-black text-amber-400 mt-2 font-display">
-                                    {stats.total_study_hours} {t("hours_short")}
-                                </p>
-                            </div>
-                            <div className="bento-card p-5">
-                                <span className="text-xs text-slate-400 font-bold">{t("stat_global_rank")}</span>
-                                <p className="text-2xl sm:text-3xl font-black text-cyan-400 mt-2 font-display">#{stats.leaderboard_rank}</p>
-                            </div>
-                        </div>
-
-                        <StudyHeatmap heatmapData={heatmap} t={t}></StudyHeatmap>
-
-                        {/* ۴. تخته مأموریت‌های درسی (Quest Board) و ثبت سریع */}
-                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                            <div className="lg:col-span-7 bento-card rim-light-ai p-6 space-y-4">
-                                <div className="flex items-center justify-between">
-                                    <h3 className="text-lg font-black flex items-center gap-2">
-                                        <span>📜</span>
-                                        <span>{t("quest_board_courses")}</span>
-                                    </h3>
-                                </div>
-                                <form
-                                    onSubmit={async (e) => {
-                                        e.preventDefault();
-                                        const fd = new FormData(e.target);
-                                        try {
-                                            await api("/courses", {
-                                                method: "POST",
-                                                body: JSON.stringify({
-                                                    name: fd.get("name"),
-                                                    weekly_goal_hours: parseFloat(fd.get("hours")),
-                                                    color: fd.get("color")
-                                                })
-                                            });
-                                            e.target.reset();
-                                            spawnParticleBurst(window.innerWidth / 2, window.innerHeight / 2);
-                                            refreshAll();
-                                        } catch (err) {
-                                            notify(err.message, "error");
-                                        }
-                                    }}
-                                    className="grid grid-cols-1 sm:grid-cols-4 gap-2.5"
-                                >
-                                    <input name="name" required placeholder={t("course_name_ph")} className="sm:col-span-2 px-3.5 py-2.5 rounded-xl bg-elevated border border-slate-700/50 text-xs" />
-                                    <div className="flex gap-2">
-                                        <input name="hours" type="number" step="0.5" min="1" max="60" defaultValue="5" required placeholder={t("weekly_hours_ph")} className="w-full px-3 py-2.5 rounded-xl bg-elevated border border-slate-700/50 text-xs" />
-                                        <input name="color" type="color" defaultValue="#8b5cf6" className="w-10 h-10 rounded-lg bg-transparent cursor-pointer" />
+                                        <div className="px-3 py-1 rounded-xl bg-[#FBEFEF] border border-[#F9DFDF] text-xs font-extrabold text-[#2D2525]">
+                                            {user ? user.character_name : "Minti"} 💖
+                                        </div>
                                     </div>
-                                    <button type="submit" className="tactile-btn py-2.5 px-4 rounded-xl text-xs">{t("add_course")}</button>
-                                </form>
 
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                                    {courses.length === 0 ? (
-                                        <p className="text-xs text-slate-400 col-span-2">{t("no_courses")}</p>
-                                    ) : (
-                                        courses.map(c => {
-                                            const diffBadge = c.weekly_goal_hours >= 10
-                                                ? { label: t("diff_legendary"), cls: "badge-legendary" }
-                                                : c.weekly_goal_hours >= 5
-                                                ? { label: t("diff_hard"), cls: "badge-hard" }
-                                                : { label: t("diff_easy"), cls: "badge-easy" };
-                                            const questXp = Math.round(c.weekly_goal_hours * 600);
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center my-auto">
+                                        {/* 3D Animated Minti */}
+                                        <div className="h-64 sm:h-72">
+                                            <MintiCharacter3D
+                                                state={timerRunning ? "study" : characterAnimState}
+                                                equippedHat={user ? user.equipped_hat : null}
+                                                equippedGlasses={user ? user.equipped_glasses : null}
+                                                equippedOutfit={user ? user.equipped_outfit : "classic"}
+                                                equippedAccessory={user ? user.equipped_accessory : "sprout"}
+                                                equippedJewelry={user ? user.equipped_jewelry : null}
+                                                size="md"
+                                                onCharacterClick={() => setCharacterAnimState("happy")}
+                                            />
+                                        </div>
 
-                                            return (
-                                                <div key={c.id} className="p-4 rounded-xl bg-elevated border border-white/10 hover:border-accent flex items-center justify-between transition">
-                                                    <div className="flex items-center gap-3">
-                                                        <span className="w-2.5 h-10 rounded-full" style={{ background: c.color, boxShadow: `0 0 10px ${c.color}` }}></span>
-                                                        <div>
-                                                            <div className="flex items-center gap-1.5">
-                                                                <span className={`text-[9px] px-2 py-0.5 rounded font-black ${diffBadge.cls}`}>{diffBadge.label}</span>
-                                                                <span className="text-[10px] font-black text-amber-300">+{questXp} XP</span>
-                                                            </div>
-                                                            <h4 className="font-bold text-sm mt-1">{c.name}</h4>
-                                                            <span className="text-[11px] text-slate-400">Target: {c.weekly_goal_hours} {t("hours_short")}/wk</span>
-                                                        </div>
-                                                    </div>
-                                                    <button
-                                                        onClick={async () => {
-                                                            await api(`/courses/${c.id}`, { method: "DELETE" });
-                                                            refreshAll();
-                                                        }}
-                                                        className="text-xs text-slate-500 hover:text-red-400 px-2"
-                                                    >
-                                                        ✕
+                                        {/* Circular Timer & Action Button */}
+                                        <div className="flex flex-col items-center justify-center text-center space-y-4">
+                                            <div className="relative w-44 h-44 flex items-center justify-center">
+                                                <svg className="w-full h-full" viewBox="0 0 160 160">
+                                                    <circle cx="80" cy="80" r="68" stroke="#FBEFEF" strokeWidth="12" fill="none" />
+                                                    <circle
+                                                        cx="80" cy="80" r="68"
+                                                        stroke="#F5AFAF" strokeWidth="12" fill="none"
+                                                        strokeDasharray={2 * Math.PI * 68}
+                                                        strokeDashoffset={(2 * Math.PI * 68) * (1 - (remainingSec / (targetMins * 60)))}
+                                                        className="sm-timer-ring-fill"
+                                                    />
+                                                </svg>
+                                                <div className="absolute flex flex-col items-center">
+                                                    <span className="text-3xl font-black text-[#2D2525] tracking-tight">
+                                                        {formatTime(remainingSec)}
+                                                    </span>
+                                                    <span className="text-xs font-semibold text-[#8C7777]">{timerRunning ? "تمرکز عمیق" : "آماده"}</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Action Button */}
+                                            {timerRunning ? (
+                                                <div className="flex items-center gap-3">
+                                                    <button onClick={handlePauseResume} className="sm-btn-secondary px-5 py-2.5 text-xs">
+                                                        {timerPaused ? t("timer_resume") : t("timer_pause")}
+                                                    </button>
+                                                    <button onClick={handleAbandonSession} className="px-5 py-2.5 rounded-2xl bg-rose-50 text-rose-600 font-bold text-xs hover:bg-rose-100">
+                                                        {t("timer_end")}
                                                     </button>
                                                 </div>
-                                            );
-                                        })
-                                    )}
-                                </div>
-                            </div>
-
-                            <div className="lg:col-span-5 bento-card p-6 space-y-4">
-                                <h3 className="text-lg font-black">{t("quick_log_header")}</h3>
-                                <div className="p-3 rounded-xl bg-elevated space-y-1.5">
-                                    <div className="flex justify-between text-xs font-bold">
-                                        <span className="text-slate-400">{t("quick_log_cap_label")}</span>
-                                        <span className="text-accent">{stats.today_quick_minutes} / 600 {t("mins_short")} ({stats.remaining_quick_minutes} {t("quick_log_remaining")})</span>
-                                    </div>
-                                    <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
-                                        <div className="h-full bg-violet-500 transition-all" style={{ width: `${Math.min(100, (stats.today_quick_minutes / 600) * 100)}%` }}></div>
-                                    </div>
-                                </div>
-
-                                <form
-                                    onSubmit={async (e) => {
-                                        e.preventDefault();
-                                        const fd = new FormData(e.target);
-                                        try {
-                                            await api("/sessions", {
-                                                method: "POST",
-                                                body: JSON.stringify({
-                                                    course_id: parseInt(fd.get("course_id")),
-                                                    duration_minutes: parseInt(fd.get("duration_minutes")),
-                                                    notes: fd.get("notes")
-                                                })
-                                            });
-                                            e.target.reset();
-                                            spawnParticleBurst(window.innerWidth / 2, window.innerHeight / 2);
-                                            notify(lang === "fa" ? "مأموریت ثبت شد و XP دریافت کردید!" : "Quest logged & XP gained!");
-                                            refreshAll();
-                                        } catch (err) {
-                                            notify(err.message, "error");
-                                        }
-                                    }}
-                                    className="space-y-3"
-                                >
-                                    <select name="course_id" required className="w-full px-3.5 py-2.5 rounded-xl bg-elevated border border-slate-700/50 text-xs">
-                                        <option value="">{t("select_course")}</option>
-                                        {courses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                    </select>
-                                    <input name="duration_minutes" type="number" min="1" max={Math.max(1, stats.remaining_quick_minutes)} required placeholder={t("duration_mins_ph")} className="w-full px-3.5 py-2.5 rounded-xl bg-elevated border border-slate-700/50 text-xs" />
-                                    <input name="notes" placeholder={t("notes_ph")} className="w-full px-3.5 py-2.5 rounded-xl bg-elevated border border-slate-700/50 text-xs" />
-                                    <button type="submit" disabled={stats.remaining_quick_minutes <= 0} className="w-full tactile-btn py-3 rounded-xl text-xs disabled:opacity-40">
-                                        {t("log_btn")}
-                                    </button>
-                                </form>
-
-                                <div className="pt-2 border-t border-slate-800/50 space-y-2">
-                                    <span className="text-[11px] font-bold text-slate-400 uppercase">{t("recent_logs")}</span>
-                                    {sessions.length === 0 ? (
-                                        <p className="text-xs text-slate-500">{t("no_logs")}</p>
-                                    ) : (
-                                        sessions.slice(0, 4).map(s => (
-                                            <div key={s.id} className="flex justify-between text-xs p-2.5 rounded-lg bg-elevated border border-white/5">
-                                                <span className="font-bold">{s.course_name}</span>
-                                                <span className="text-cyan-400 font-bold">+{s.duration_minutes * 10} XP ({s.duration_minutes}m)</span>
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {activeTab === "pomodoro" && (
-                    <div className="bento-card rim-light-boss p-6 sm:p-10 max-w-2xl mx-auto text-center space-y-6">
-                        <h2 className="text-2xl sm:text-3xl font-black">{t("pomo_header")}</h2>
-                        <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-semibold">
-                            🛡️ {t("pomo_rule_banner")}
-                        </div>
-
-                        <div className="flex flex-wrap justify-center gap-2.5">
-                            {[25, 50, 75, 100].map(m => (
-                                <button
-                                    key={m}
-                                    disabled={!!pomoSessionId}
-                                    onClick={() => {
-                                        setPomoTargetMins(m);
-                                        setPomoRemainingSec(m * 60);
-                                    }}
-                                    className={`px-4 py-2 rounded-xl text-xs font-bold transition ${pomoTargetMins === m ? "tactile-btn" : "bg-elevated border border-slate-700/50"} disabled:opacity-50`}
-                                >
-                                    {m} {t("mins_short")} (+{(m / 25) * 10} 🪙 / -{m} Boss HP)
-                                </button>
-                            ))}
-                        </div>
-
-                        <input
-                            value={pomoTopic}
-                            disabled={!!pomoSessionId}
-                            onChange={(e) => setPomoTopic(e.target.value)}
-                            placeholder={t("pomo_topic_ph")}
-                            className="w-full max-w-md mx-auto block px-4 py-3 rounded-xl bg-elevated border border-slate-700/60 text-xs text-center"
-                        />
-
-                        <div className="relative w-64 h-64 sm:w-72 sm:h-72 mx-auto flex items-center justify-center">
-                            {(() => {
-                                const totalSec = pomoTargetMins * 60;
-                                const elapsed = totalSec - pomoRemainingSec;
-                                const pct = totalSec > 0 ? Math.min(100, Math.round((elapsed / totalSec) * 100)) : 0;
-                                const dash = 691;
-                                const offset = dash - (pct / 100) * dash;
-                                const mm = String(Math.floor(pomoRemainingSec / 60)).padStart(2, "0");
-                                const ss = String(pomoRemainingSec % 60).padStart(2, "0");
-                                return (
-                                    <>
-                                        <svg className="w-full h-full -rotate-90" viewBox="0 0 250 250">
-                                            <circle cx="125" cy="125" r="110" stroke="currentColor" strokeWidth="10" className="text-slate-800" fill="transparent" />
-                                            <circle
-                                                cx="125"
-                                                cy="125"
-                                                r="110"
-                                                stroke="var(--accent-primary)"
-                                                strokeWidth="12"
-                                                strokeLinecap="round"
-                                                fill="transparent"
-                                                strokeDasharray={dash}
-                                                strokeDashoffset={offset}
-                                                style={{ transition: "stroke-dashoffset 0.8s linear", filter: "drop-shadow(0 0 12px var(--accent-glow))" }}
-                                            />
-                                        </svg>
-                                        <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                            <span className="text-5xl font-black font-display tracking-wider">{mm}:{ss}</span>
-                                            <span className="text-xs font-bold text-accent mt-2">{pct}% CHARGED</span>
+                                            ) : (
+                                                <button
+                                                    onClick={() => handleStartTimer(25)}
+                                                    className="sm-btn-primary px-8 py-3.5 text-sm w-48 shadow-soft flex items-center justify-center gap-2"
+                                                >
+                                                    <span>{t("start_study")}</span>
+                                                    <span>➔</span>
+                                                </button>
+                                            )}
                                         </div>
-                                    </>
-                                );
-                            })()}
-                        </div>
-
-                        <p className="text-xs text-slate-400">
-                            {pomoSessionId ? t("pomo_running_hint") : t("pomo_ready_hint")}
-                        </p>
-
-                        <div className="flex justify-center gap-3">
-                            {!pomoSessionId ? (
-                                <button onClick={handleStartPomodoro} className="attack-btn px-8 py-4 rounded-2xl text-sm">
-                                    ⚔️ {t("pomo_start_btn")}
-                                </button>
-                            ) : (
-                                <>
-                                    <button onClick={() => setPomoPaused(!pomoPaused)} className="px-6 py-3.5 rounded-xl bg-amber-500 text-slate-950 font-bold text-xs">
-                                        {pomoPaused ? t("pomo_resume_btn") : t("pomo_pause_btn")}
-                                    </button>
-                                    <button onClick={handleAbandonPomodoro} className="px-6 py-3.5 rounded-xl bg-red-500/20 border border-red-500/40 text-red-300 font-bold text-xs">
-                                        {t("pomo_abandon_btn")}
-                                    </button>
-                                </>
-                            )}
-                        </div>
-                    </div>
-                )}
-
-                {/* TAB 3: GEMINI AI QUEST BOARD (با بج سختی و انفجار ذرات هنگام تکمیل کوئست) */}
-                {activeTab === "ai" && (
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                        <div className="lg:col-span-4 space-y-5">
-                            <div className="bento-card rim-light-ai p-6 space-y-4">
-                                <h2 className="text-xl font-black">{t("ai_header")}</h2>
-                                <p className="text-xs text-slate-400">{t("ai_sub")}</p>
-
-                                <form
-                                    onSubmit={async (e) => {
-                                        e.preventDefault();
-                                        const fd = new FormData(e.target);
-                                        setAiLoading(true);
-                                        try {
-                                            const created = await api("/ai/generate-plan", {
-                                                method: "POST",
-                                                body: JSON.stringify({
-                                                    goal_title: fd.get("goal_title"),
-                                                    target_date: fd.get("target_date"),
-                                                    daily_hours: parseFloat(fd.get("daily_hours")),
-                                                    topics: fd.get("topics").split(/[,،]/).map(s => s.trim()).filter(Boolean),
-                                                    notes: fd.get("notes") || null,
-                                                    lang
-                                                })
-                                            });
-                                            const full = await api(`/ai/plans/${created.id}`);
-                                            setSelectedPlan(full);
-                                            loadAIPlans();
-                                        } catch (err) {
-                                            notify(err.message, "error");
-                                        } finally {
-                                            setAiLoading(false);
-                                        }
-                                    }}
-                                    className="space-y-3"
-                                >
-                                    <input name="goal_title" required placeholder={t("ai_goal_ph")} className="w-full px-3.5 py-2.5 rounded-xl bg-elevated border border-slate-700/50 text-xs" />
-                                    <div>
-                                        <label className="block text-[11px] font-bold text-slate-400 mb-1">{t("ai_target_date")}</label>
-                                        <input name="target_date" type="date" min={getTomorrowISO()} defaultValue={getTomorrowISO()} required className="w-full px-3.5 py-2.5 rounded-xl bg-elevated border border-slate-700/50 text-xs" />
                                     </div>
-                                    <div>
-                                        <label className="block text-[11px] font-bold text-slate-400 mb-1">{t("ai_daily_hours")}</label>
-                                        <input name="daily_hours" type="number" step="0.5" min="1" max="14" defaultValue="3.5" required className="w-full px-3.5 py-2.5 rounded-xl bg-elevated border border-slate-700/50 text-xs" />
-                                    </div>
-                                    <input name="topics" required placeholder={t("ai_topics_ph")} className="w-full px-3.5 py-2.5 rounded-xl bg-elevated border border-slate-700/50 text-xs" />
-                                    <textarea name="notes" rows="2" placeholder={t("ai_notes_ph")} className="w-full px-3.5 py-2.5 rounded-xl bg-elevated border border-slate-700/50 text-xs"></textarea>
-                                    <button type="submit" disabled={aiLoading} className="w-full tactile-btn py-3 rounded-xl text-xs">
-                                        {aiLoading ? t("ai_generating") : t("ai_generate_btn")}
-                                    </button>
-                                </form>
-                            </div>
+                                </div>
 
-                            <div className="bento-card p-5 space-y-2.5">
-                                <h3 className="text-sm font-black">{t("ai_saved_plans")}</h3>
-                                {plans.length === 0 ? (
-                                    <p className="text-xs text-slate-400">{t("ai_no_plans")}</p>
-                                ) : (
-                                    plans.map(p => (
-                                        <div
-                                            key={p.id}
-                                            onClick={async () => {
-                                                const d = await api(`/ai/plans/${p.id}`);
-                                                setSelectedPlan(d);
-                                            }}
-                                            className={`p-3 rounded-xl border cursor-pointer flex justify-between items-center text-xs ${selectedPlan?.id === p.id ? "border-accent bg-indigo-500/10" : "border-slate-800 bg-elevated"}`}
-                                        >
-                                            <div>
-                                                <p className="font-bold">{p.goal_title}</p>
-                                                <span className="text-[10px] text-slate-400">{p.target_date}</span>
+                                {/* Right Column: Goals & Cyber Boss Cards */}
+                                <div className="lg:col-span-4 space-y-6">
+                                    {/* Daily Goal Card */}
+                                    <div className="bg-white rounded-3xl p-6 border border-[#F9DFDF] shadow-card space-y-4">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-lg">🎯</span>
+                                                <span className="font-extrabold text-sm">{t("today_goal")}</span>
                                             </div>
-                                            <button
-                                                onClick={async (ev) => {
-                                                    ev.stopPropagation();
-                                                    await api(`/ai/plans/${p.id}`, { method: "DELETE" });
-                                                    setSelectedPlan(null);
-                                                    loadAIPlans();
-                                                }}
-                                                className="text-slate-400 hover:text-red-400 px-2"
-                                            >
-                                                ✕
+                                            <span className="text-xs font-bold text-[#8C7777]">
+                                                {stats ? `${stats.today_study_hours} / ${stats.today_goal_hours} ${t("hours_short")}` : "0 / 2"}
+                                            </span>
+                                        </div>
+                                        <div className="w-full bg-[#FBEFEF] rounded-full h-3 overflow-hidden">
+                                            <div
+                                                className="bg-[#F5AFAF] h-full rounded-full transition-all duration-500"
+                                                style={{ width: `${stats ? stats.today_goal_percentage : 0}%` }}
+                                            />
+                                        </div>
+                                        <div className="flex justify-between text-[11px] text-[#8C7777] font-semibold">
+                                            <span>پیشرفت روز</span>
+                                            <span>{stats ? stats.today_goal_percentage : 0}%</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Weekly Goal Card (20 Hours baseline requirement) */}
+                                    <div className="bg-white rounded-3xl p-6 border border-[#F9DFDF] shadow-card space-y-4">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-lg">📅</span>
+                                                <span className="font-extrabold text-sm">{t("weekly_goal")}</span>
+                                            </div>
+                                            <span className="text-xs font-bold text-[#8C7777]">
+                                                {stats ? `${stats.weekly_study_hours} / 20 ${t("hours_short")}` : "0 / 20"}
+                                            </span>
+                                        </div>
+                                        <div className="w-full bg-[#FBEFEF] rounded-full h-3 overflow-hidden">
+                                            <div
+                                                className="bg-emerald-400 h-full rounded-full transition-all duration-500"
+                                                style={{ width: `${stats ? stats.weekly_goal_percentage : 0}%` }}
+                                            />
+                                        </div>
+                                        <div className="flex justify-between text-[11px] text-[#8C7777] font-semibold">
+                                            <span>{t("weekly_goal_sub")}</span>
+                                            <span>{stats ? stats.weekly_goal_percentage : 0}%</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Weekly Challenge: Defeat Cyber Boss Card */}
+                                    {weeklyChallenge && (
+                                        <div className="bg-gradient-to-br from-[#FBEFEF] to-[#F9DFDF] rounded-3xl p-6 border border-[#F5AFAF] shadow-card space-y-3">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-xs font-extrabold text-[#2D2525]">⚔️ {weeklyChallenge.boss_name_fa}</span>
+                                                <span className="text-[11px] font-bold text-[#8C7777]">{weeklyChallenge.days_remaining} {t("days_left")}</span>
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-12 h-12 rounded-2xl bg-slate-900 flex items-center justify-center text-xl shadow-md">
+                                                    👾
+                                                </div>
+                                                <div className="flex-1 space-y-1.5">
+                                                    <div className="w-full bg-white rounded-full h-2.5 overflow-hidden">
+                                                        <div
+                                                            className="bg-rose-500 h-full rounded-full transition-all"
+                                                            style={{ width: `${weeklyChallenge.hp_percentage}%` }}
+                                                        />
+                                                    </div>
+                                                    <div className="flex justify-between text-[11px] font-bold text-[#5A4A4A]">
+                                                        <span>HP: {weeklyChallenge.current_hp} / {weeklyChallenge.max_hp}</span>
+                                                        <span>{weeklyChallenge.hp_percentage}%</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <button onClick={() => setActiveTab("challenges")} className="w-full py-2 rounded-2xl bg-white hover:bg-[#FCF8F8] text-[#2D2525] font-bold text-xs border border-[#F5AFAF]">
+                                                مشاهده و حمله ➔
                                             </button>
                                         </div>
-                                    ))
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Bottom Grid: Stats Row + Online Friends + Leaderboard Snippet */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                {/* Stats Summary */}
+                                <div className="bg-white rounded-3xl p-6 border border-[#F9DFDF] shadow-card flex items-center justify-around">
+                                    <div className="text-center">
+                                        <span className="text-2xl">🔥</span>
+                                        <p className="text-lg font-black text-[#2D2525] mt-1">{stats ? stats.current_streak : 0}</p>
+                                        <p className="text-xs text-[#8C7777] font-bold">{t("streak_label")}</p>
+                                    </div>
+                                    <div className="h-10 w-px bg-[#FBEFEF]"></div>
+                                    <div className="text-center">
+                                        <span className="text-2xl">⭐</span>
+                                        <p className="text-lg font-black text-[#2D2525] mt-1">{stats ? stats.xp : 0}</p>
+                                        <p className="text-xs text-[#8C7777] font-bold">{t("xp_label")}</p>
+                                    </div>
+                                    <div className="h-10 w-px bg-[#FBEFEF]"></div>
+                                    <div className="text-center">
+                                        <span className="text-2xl">🪙</span>
+                                        <p className="text-lg font-black text-[#2D2525] mt-1">{stats ? stats.coins : 0}</p>
+                                        <p className="text-xs text-[#8C7777] font-bold">{t("coins_label")}</p>
+                                    </div>
+                                </div>
+
+                                {/* Online Friends Snippet */}
+                                <div className="bg-white rounded-3xl p-6 border border-[#F9DFDF] shadow-card flex flex-col justify-between">
+                                    <div className="flex items-center justify-between">
+                                        <span className="font-extrabold text-sm">{t("online_friends")}</span>
+                                        <button onClick={() => setActiveTab("friends")} className="text-xs text-[#8C7777] font-bold hover:text-[#2D2525]">
+                                            {t("view_all")}
+                                        </button>
+                                    </div>
+                                    <div className="flex items-center gap-2 py-3">
+                                        {friends.length > 0 ? (
+                                            friends.slice(0, 4).map(f => (
+                                                <div key={f.id} className="relative group">
+                                                    <div className="w-10 h-10 rounded-2xl bg-[#FBEFEF] border border-[#F9DFDF] flex items-center justify-center font-bold text-xs">
+                                                        {f.username[0].toUpperCase()}
+                                                    </div>
+                                                    <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-400 border-2 border-white"></span>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <p className="text-xs text-[#8C7777]">هنوز دوستی آنلاین نیست.</p>
+                                        )}
+                                    </div>
+                                    <button onClick={() => setActiveTab("friends")} className="text-xs font-bold text-[#F5AFAF] text-start">
+                                        + افزودن دوست جدید
+                                    </button>
+                                </div>
+
+                                {/* Leaderboard Snippet */}
+                                <div className="bg-white rounded-3xl p-6 border border-[#F9DFDF] shadow-card flex flex-col justify-between">
+                                    <div className="flex items-center justify-between">
+                                        <span className="font-extrabold text-sm">{t("leaderboard_title")}</span>
+                                        <button onClick={() => setActiveTab("leaderboard")} className="text-xs text-[#8C7777] font-bold hover:text-[#2D2525]">
+                                            {t("view_all")}
+                                        </button>
+                                    </div>
+                                    <div className="space-y-2 py-2">
+                                        {leaderboard.slice(0, 3).map((lbUser, idx) => (
+                                            <div key={lbUser.user_id} className="flex items-center justify-between text-xs">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-bold text-[#8C7777]">{idx + 1}.</span>
+                                                    <span className="font-extrabold text-[#2D2525]">{lbUser.username}</span>
+                                                </div>
+                                                <span className="font-bold text-[#8C7777]">{lbUser.total_study_hours}h</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="text-[11px] text-[#8C7777] font-semibold">
+                                        رتبه شما: #{stats ? stats.leaderboard_rank : "-"}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 2. STUDY TIMER VIEW (MATCHING REFERENCE IMAGE 2 MIDDLE LEFT) */}
+                    {activeTab === "study" && (
+                        <div className="max-w-4xl mx-auto space-y-6">
+                            <div className="bg-white rounded-3xl p-8 border border-[#F9DFDF] shadow-card space-y-8 text-center">
+                                {/* Header / Subject selector */}
+                                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-[#FBEFEF] pb-6">
+                                    <div className="text-start">
+                                        <h3 className="text-2xl font-black text-[#2D2525]">{t("study_timer_title")}</h3>
+                                        <p className="text-xs text-[#8C7777]">{t("pomo_rule_banner")}</p>
+                                    </div>
+
+                                    {/* Duration Preset Pills */}
+                                    <div className="flex items-center gap-2">
+                                        {[25, 50, 75].map(m => (
+                                            <button
+                                                key={m}
+                                                disabled={timerRunning}
+                                                onClick={() => { setTargetMins(m); setRemainingSec(m * 60); }}
+                                                className={`px-4 py-2 rounded-2xl font-bold text-xs transition-all ${
+                                                    targetMins === m
+                                                        ? "bg-[#F5AFAF] text-[#2D2525] shadow-sm"
+                                                        : "bg-[#FBEFEF] text-[#5A4A4A] hover:bg-[#F9DFDF]"
+                                                }`}
+                                            >
+                                                {m} min
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Subject & Topic Input */}
+                                <div className="max-w-md mx-auto">
+                                    <input
+                                        type="text"
+                                        disabled={timerRunning}
+                                        value={pomoTopic}
+                                        onChange={(e) => setPomoTopic(e.target.value)}
+                                        placeholder="نام درس یا مبحث (مثلاً ریاضی - فصل ۴: مثلثات)..."
+                                        className="w-full px-5 py-3 rounded-2xl bg-[#FBEFEF] border border-[#F9DFDF] text-xs font-bold text-[#2D2525] focus:outline-none focus:border-[#F5AFAF] text-center"
+                                    />
+                                </div>
+
+                                {/* 3D Character in Study Desk Mode + Timer */}
+                                <div className="flex flex-col md:flex-row items-center justify-center gap-10">
+                                    <div className="w-56 h-56">
+                                        <MintiCharacter3D
+                                            state={timerRunning ? "study" : "idle"}
+                                            equippedHat={user ? user.equipped_hat : null}
+                                            equippedGlasses={user ? user.equipped_glasses : null}
+                                            equippedOutfit={user ? user.equipped_outfit : "classic"}
+                                            equippedAccessory={user ? user.equipped_accessory : "sprout"}
+                                            equippedJewelry={user ? user.equipped_jewelry : null}
+                                            size="md"
+                                        />
+                                    </div>
+
+                                    {/* Huge Circular Timer */}
+                                    <div className="relative w-56 h-56 flex items-center justify-center">
+                                        <svg className="w-full h-full" viewBox="0 0 200 200">
+                                            <circle cx="100" cy="100" r="85" stroke="#FBEFEF" strokeWidth="14" fill="none" />
+                                            <circle
+                                                cx="100" cy="100" r="85"
+                                                stroke="#F5AFAF" strokeWidth="14" fill="none"
+                                                strokeDasharray={2 * Math.PI * 85}
+                                                strokeDashoffset={(2 * Math.PI * 85) * (1 - (remainingSec / (targetMins * 60)))}
+                                                className="sm-timer-ring-fill"
+                                            />
+                                        </svg>
+                                        <div className="absolute flex flex-col items-center">
+                                            <span className="text-4xl font-black text-[#2D2525] tracking-tight">
+                                                {formatTime(remainingSec)}
+                                            </span>
+                                            <span className="text-xs font-bold text-[#8C7777] mt-1">
+                                                {timerRunning ? "تمرکز عمیق" : "آماده برای شروع"}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Reward Preview Card */}
+                                <div className="inline-flex items-center gap-6 px-6 py-3 rounded-2xl bg-[#FBEFEF] border border-[#F9DFDF]">
+                                    <span className="text-xs font-extrabold text-[#2D2525]">{t("session_rewards_preview")}</span>
+                                    <span className="text-xs font-black text-amber-600">⭐ +50 XP</span>
+                                    <span className="text-xs font-black text-yellow-600">🪙 +{Math.floor(targetMins / 25) * 10 || 10} سکه</span>
+                                    <span className="text-[11px] text-[#8C7777]">({t("session_rewards_sub")})</span>
+                                </div>
+
+                                {/* Action Controls */}
+                                <div className="flex items-center justify-center gap-4 pt-4">
+                                    {timerRunning ? (
+                                        <>
+                                            <button onClick={handlePauseResume} className="sm-btn-secondary px-6 py-3 text-sm">
+                                                {timerPaused ? t("timer_resume") : t("timer_pause")}
+                                            </button>
+                                            <button onClick={handleAbandonSession} className="px-6 py-3 rounded-2xl bg-rose-50 text-rose-600 font-bold text-sm hover:bg-rose-100">
+                                                {t("timer_end")}
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <button
+                                            onClick={() => handleStartTimer()}
+                                            className="sm-btn-primary px-10 py-4 text-base shadow-soft"
+                                        >
+                                            {t("timer_start")} ➔
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* STUDY PLANNER VIEW (GEMINI AI ROADMAP) */}
+                    {activeTab === "planner" && (
+                        <div className="max-w-4xl mx-auto space-y-6">
+                            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#F9DFDF] shadow-card space-y-6">
+                                <div className="border-b border-[#FBEFEF] pb-4">
+                                    <h3 className="text-xl font-black text-[#2D2525]">برنامه‌ریزی هوشمند درسی 📅</h3>
+                                    <p className="text-xs text-[#8C7777] mt-1">تولید نقشه راه روزبه‌روز با هوش مصنوعی بر اساس موعد امتحان و اولویت‌های شما</p>
+                                </div>
+
+                                <form onSubmit={handleGeneratePlan} className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-5 rounded-3xl bg-[#FCF8F8] border border-[#F9DFDF]">
+                                    <div className="sm:col-span-2">
+                                        <label className="block text-xs font-bold text-[#8C7777] mb-1">عنوان هدف یا امتحان:</label>
+                                        <input
+                                            type="text"
+                                            required
+                                            value={plannerForm.goal_title}
+                                            onChange={(e) => setPlannerForm({ ...plannerForm, goal_title: e.target.value })}
+                                            placeholder="مثلاً: پایان‌ترم ریاضی و فیزیک..."
+                                            className="w-full px-4 py-2.5 rounded-2xl bg-white border border-[#F9DFDF] text-xs font-bold text-[#2D2525] focus:outline-none focus:border-[#F5AFAF]"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-[#8C7777] mb-1">تاریخ موعد امتحان / هدف:</label>
+                                        <input
+                                            type="date"
+                                            required
+                                            value={plannerForm.target_date}
+                                            onChange={(e) => setPlannerForm({ ...plannerForm, target_date: e.target.value })}
+                                            className="w-full px-4 py-2.5 rounded-2xl bg-white border border-[#F9DFDF] text-xs font-bold text-[#2D2525] focus:outline-none focus:border-[#F5AFAF]"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-[#8C7777] mb-1">ساعت مطالعه روزانه:</label>
+                                        <input
+                                            type="number"
+                                            step="0.5"
+                                            min="1"
+                                            max="12"
+                                            value={plannerForm.daily_hours}
+                                            onChange={(e) => setPlannerForm({ ...plannerForm, daily_hours: e.target.value })}
+                                            className="w-full px-4 py-2.5 rounded-2xl bg-white border border-[#F9DFDF] text-xs font-bold text-[#2D2525] focus:outline-none focus:border-[#F5AFAF]"
+                                        />
+                                    </div>
+                                    <div className="sm:col-span-2">
+                                        <label className="block text-xs font-bold text-[#8C7777] mb-1">مباحث یا فصول اصلی (با ویرگول جدا کنید):</label>
+                                        <input
+                                            type="text"
+                                            value={plannerForm.topics}
+                                            onChange={(e) => setPlannerForm({ ...plannerForm, topics: e.target.value })}
+                                            placeholder="مبحث ۱، مبحث ۲، حل تمرین، مرور جامع..."
+                                            className="w-full px-4 py-2.5 rounded-2xl bg-white border border-[#F9DFDF] text-xs font-bold text-[#2D2525] focus:outline-none focus:border-[#F5AFAF]"
+                                        />
+                                    </div>
+                                    <div className="sm:col-span-2 text-end">
+                                        <button
+                                            type="submit"
+                                            disabled={plannerLoading}
+                                            className="sm-btn-primary px-6 py-2.5 text-xs shadow-soft"
+                                        >
+                                            {plannerLoading ? "در حال خلق برنامه..." : "✨ تولید نقشه راه هوشمند"}
+                                        </button>
+                                    </div>
+                                </form>
+
+                                {plans.length > 0 && (
+                                    <div className="space-y-3">
+                                        <h4 className="font-extrabold text-sm text-[#2D2525]">برنامه‌های شما:</h4>
+                                        <div className="flex flex-wrap gap-2">
+                                            {plans.map(p => (
+                                                <button
+                                                    key={p.id}
+                                                    onClick={() => handleSelectPlan(p.id)}
+                                                    className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all border ${
+                                                        selectedPlan && selectedPlan.id === p.id
+                                                            ? "bg-[#F5AFAF] text-[#2D2525] border-[#F5AFAF]"
+                                                            : "bg-[#FCF8F8] text-[#5A4A4A] border-[#F9DFDF] hover:bg-[#FBEFEF]"
+                                                    }`}
+                                                >
+                                                    {p.goal_title} ({p.daily_hours}h/روز)
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {selectedPlan && (
+                                    <div className="space-y-4 pt-4 border-t border-[#FBEFEF]">
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <h4 className="text-lg font-black text-[#2D2525]">{selectedPlan.goal_title}</h4>
+                                                <p className="text-xs text-[#8C7777] mt-0.5">{selectedPlan.motivational_quote}</p>
+                                            </div>
+                                            <span className="text-xs font-extrabold px-3 py-1 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                {selectedPlan.progress_percentage}% پیشرفت
+                                            </span>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            {selectedPlan.schedule && selectedPlan.schedule.map(day => {
+                                                const isDone = (selectedPlan.completed_days || []).includes(day.day_number);
+                                                return (
+                                                    <div
+                                                        key={day.day_number}
+                                                        onClick={() => handleTogglePlanDay(selectedPlan.id, day.day_number)}
+                                                        className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
+                                                            isDone
+                                                                ? "bg-emerald-50/60 border-emerald-200"
+                                                                : "bg-[#FCF8F8] border-[#F9DFDF] hover:border-[#F5AFAF]"
+                                                        }`}
+                                                    >
+                                                        <div className="flex items-center gap-3">
+                                                            <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold border ${
+                                                                isDone ? "bg-emerald-500 text-white border-emerald-500" : "bg-white border-[#F9DFDF] text-[#8C7777]"
+                                                            }`}>
+                                                                {isDone ? "✓" : day.day_number}
+                                                            </div>
+                                                            <div>
+                                                                <p className={`text-xs font-extrabold ${isDone ? "line-through text-[#8C7777]" : "text-[#2D2525]"}`}>
+                                                                    روز {day.day_number}: {day.focus_topic}
+                                                                </p>
+                                                                <p className="text-[11px] text-[#8C7777]">{day.action_item}</p>
+                                                            </div>
+                                                        </div>
+                                                        <div className="text-end">
+                                                            <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-[#FBEFEF] text-[#8C7777]">
+                                                                +{day.potential_coins} 🪙
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
                                 )}
                             </div>
                         </div>
+                    )}
 
-                        <div className="lg:col-span-8">
-                            {!selectedPlan ? (
-                                <div className="bento-card p-12 text-center text-slate-400 text-sm">{t("ai_select_prompt")}</div>
-                            ) : (
-                                <div className="bento-card rim-light-ai p-6 space-y-5">
-                                    <div className="flex flex-wrap justify-between items-center gap-3 border-b border-slate-800 pb-4">
-                                        <div>
-                                            <span className="text-[10px] font-black uppercase tracking-widest text-cyan-400 block">{t("quest_board_title")}</span>
-                                            <h3 className="text-2xl font-black mt-0.5">{selectedPlan.goal_title}</h3>
-                                            <span className="text-xs text-slate-400">🎯 {selectedPlan.target_date}</span>
+                    {/* 3. WARDROBE & STORE VIEW (MATCHING REFERENCE IMAGE 1 & 2) */}
+                    {activeTab === "shop" && (() => {
+                        const previewHat = previewItem?.category === "hat" 
+                            ? (previewItem.id === "none_hat" ? null : previewItem.id) 
+                            : (user ? user.equipped_hat : null);
+
+                        const previewGlasses = previewItem?.category === "glasses" 
+                            ? (previewItem.id === "none_glasses" ? null : previewItem.id) 
+                            : (user ? user.equipped_glasses : null);
+
+                        const previewOutfit = previewItem?.category === "outfit" 
+                            ? previewItem.id 
+                            : (user ? user.equipped_outfit : "classic");
+
+                        const previewAccessory = previewItem?.category === "accessory" 
+                            ? previewItem.id 
+                            : (user ? user.equipped_accessory : "sprout");
+
+                        const previewJewelry = previewItem?.category === "jewelry" 
+                            ? (previewItem.id === "none_jewelry" ? null : previewItem.id) 
+                            : (user ? user.equipped_jewelry : null);
+
+                        return (
+                            <div className="max-w-6xl mx-auto space-y-6">
+                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                                    {/* Left: 3D Minti Live Wardrobe Preview */}
+                                    <div className="lg:col-span-5 bg-white rounded-3xl p-6 border border-[#F9DFDF] shadow-card text-center space-y-4 sticky top-6">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs font-extrabold text-[#8C7777]">
+                                                {previewItem ? "✨ پیش‌نمایش پرو آیتم" : "پیش‌نمایش زنده ۳بعدی"}
+                                            </span>
+                                            <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[#FBEFEF] text-xs font-black">
+                                                <span>🪙 {stats ? stats.coins : 0}</span>
+                                            </div>
                                         </div>
-                                        <span className="px-3.5 py-1.5 rounded-xl metallic-gold-badge text-xs">
-                                            {t("ai_progress")}: {selectedPlan.progress_percentage}%
-                                        </span>
-                                    </div>
 
-                                    <div className="p-4 rounded-xl bg-elevated border-s-4 border-accent text-xs space-y-1">
-                                        <p className="font-bold text-accent">{t("ai_strategy")}</p>
-                                        <p>{selectedPlan.strategy_advice}</p>
-                                        <p className="italic text-slate-400 pt-1">"{selectedPlan.motivational_quote}"</p>
-                                    </div>
+                                        {/* 3D Character Canvas */}
+                                        <div className="h-80 relative">
+                                            <MintiCharacter3D
+                                                state={previewItem ? "welcome" : "idle"}
+                                                equippedHat={previewHat}
+                                                equippedGlasses={previewGlasses}
+                                                equippedOutfit={previewOutfit}
+                                                equippedAccessory={previewAccessory}
+                                                equippedJewelry={previewJewelry}
+                                                size="lg"
+                                                characterName={user ? user.character_name : "Minti"}
+                                            />
+                                        </div>
 
-                                    {/* Quest Log Items */}
-                                    <div className="space-y-3">
-                                        {selectedPlan.schedule.map(day => {
-                                            const todayStr = getTodayISO();
-                                            const isFuture = day.date > todayStr;
-                                            const isToday = day.date === todayStr;
-                                            const isDone = (selectedPlan.completed_days || []).includes(day.day_number);
+                                        {/* 360-Degree Rotation Pill */}
+                                        <div className="flex items-center justify-center gap-2 py-1 px-3 rounded-full bg-[#FBEFEF] text-[11px] font-bold text-[#8C7777] mx-auto w-fit">
+                                            <span>🔄</span>
+                                            <span>{t("rotate_hint")}</span>
+                                        </div>
 
-                                            const diff = day.pomodoro_blocks >= 6
-                                                ? { label: t("diff_legendary"), cls: "badge-legendary" }
-                                                : day.pomodoro_blocks >= 3
-                                                ? { label: t("diff_hard"), cls: "badge-hard" }
-                                                : { label: t("diff_easy"), cls: "badge-easy" };
-
-                                            const questXp = day.pomodoro_blocks * 250;
-
-                                            return (
-                                                <div
-                                                    key={day.day_number}
-                                                    onClick={async (e) => {
-                                                        if (isFuture) {
-                                                            notify(`${t("ai_locked_day")} ${day.date} 🔒`, "error");
-                                                            return;
-                                                        }
-                                                        try {
-                                                            const res = await api(`/ai/plans/${selectedPlan.id}/days/${day.day_number}/toggle`, { method: "POST" });
-                                                            if (res.is_completed) {
-                                                                playSynthChime();
-                                                                spawnParticleBurst(e.clientX, e.clientY);
-                                                            }
-                                                            const updated = await api(`/ai/plans/${selectedPlan.id}`);
-                                                            setSelectedPlan(updated);
-                                                        } catch (err) {
-                                                            notify(err.message, "error");
-                                                        }
-                                                    }}
-                                                    className={`p-4 rounded-2xl border transition flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${isFuture ? "opacity-50 cursor-not-allowed bg-elevated border-slate-800" : isDone ? "bg-emerald-500/10 border-emerald-500/40 cursor-pointer" : "bg-elevated border-white/10 hover:border-accent cursor-pointer"}`}
-                                                >
-                                                    <div className="flex items-start sm:items-center gap-3.5">
-                                                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-black shrink-0 ${isFuture ? "bg-slate-800 text-slate-400" : isDone ? "bg-emerald-500 text-white shadow-[0_0_12px_rgba(16,185,129,0.7)]" : "border-2 border-slate-500"}`}>
-                                                            {isFuture ? "🔒" : isDone ? "✓" : "⚔️"}
-                                                        </div>
+                                        {/* Item Try-On Action Card */}
+                                        {previewItem && (
+                                            <div className="p-4 rounded-3xl bg-[#FBEFEF] border-2 border-[#F5AFAF] text-start space-y-3 shadow-md animate-fade-in">
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-2.5">
+                                                        <span className="text-3xl">{previewItem.icon}</span>
                                                         <div>
-                                                            <div className="flex flex-wrap items-center gap-2">
-                                                                <span className={`text-[10px] px-2 py-0.5 rounded font-black ${diff.cls}`}>{diff.label}</span>
-                                                                <span className="text-xs font-black">{t("day_label")} {day.day_number} ({day.date})</span>
-                                                                {isToday && <span className="text-[10px] px-2 py-0.5 rounded bg-accent text-white font-bold">{t("ai_today_badge")}</span>}
-                                                                {isFuture && <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400">{t("ai_locked_day")} {day.date}</span>}
-                                                            </div>
-                                                            <p className={`text-xs mt-1.5 leading-relaxed ${isDone ? "line-through text-slate-400" : ""}`}>
-                                                                <strong className="text-accent">{day.focus_topic}:</strong> {day.action_item}
-                                                            </p>
+                                                            <span className="text-[10px] font-black text-rose-600 block uppercase tracking-wider">
+                                                                ✨ {t("try_on")}
+                                                            </span>
+                                                            <h5 className="font-black text-sm text-[#2D2525]">{previewItem.name_fa}</h5>
                                                         </div>
                                                     </div>
-
-                                                    {/* پاداش درخشان مأموریت */}
-                                                    <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
-                                                        <span className="px-2.5 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-[11px] font-black">
-                                                            +{questXp} XP
+                                                    <div className="text-end">
+                                                        <span className="text-xs font-black text-[#2D2525] block">
+                                                            {previewItem.price === 0 ? "رایگان" : `🪙 ${previewItem.price}`}
                                                         </span>
-                                                        <span className="px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[11px] font-black">
-                                                            +{day.potential_coins} 🪙
+                                                        <span className={`text-[10px] font-black ${
+                                                            previewItem.is_owned
+                                                                ? "text-emerald-700"
+                                                                : (stats && stats.coins >= previewItem.price ? "text-emerald-600" : "text-rose-500")
+                                                        }`}>
+                                                            {previewItem.is_owned
+                                                                ? t("owned_badge")
+                                                                : (stats && stats.coins >= previewItem.price ? t("afford_status_ok") : t("afford_status_low"))}
                                                         </span>
                                                     </div>
                                                 </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )}
+                                                <p className="text-xs text-[#5A4A4A]">{previewItem.description_fa}</p>
 
-                {activeTab === "shop" && (
-                    <div className="space-y-6">
-                        <div className="bento-card p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                            <div>
-                                <h2 className="text-2xl font-black">{t("shop_header")}</h2>
-                                <p className="text-xs text-slate-400 mt-1">{t("shop_sub")}</p>
-                            </div>
-                            <div className="px-5 py-3 rounded-2xl metallic-gold-badge text-lg">
-                                {stats?.coins || 0} 🪙
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                            {themes.map(th => (
-                                <div key={th.id} className={`bento-card overflow-hidden flex flex-col justify-between border-2 ${th.is_active ? "border-accent" : "border-transparent"}`}>
-                                    <div>
-                                        <div className={`h-28 p-5 flex items-end justify-between text-white aura-${th.id}`}>
-                                            <div>
-                                                <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-black/40">
-                                                    {th.rarity} • {th.inspiration}
-                                                </span>
-                                                <h3 className="text-xl font-black mt-1">{lang === "fa" ? th.name_fa : th.name}</h3>
+                                                <div className="flex items-center gap-2 pt-1">
+                                                    {previewItem.is_equipped ? (
+                                                        <div className="flex-1 py-2 rounded-xl bg-emerald-100 text-emerald-800 text-xs font-bold text-center">
+                                                            ✓ {t("btn_equipped")}
+                                                        </div>
+                                                    ) : previewItem.is_owned ? (
+                                                        <button
+                                                            onClick={() => handleEquipAccessory(previewItem)}
+                                                            className="sm-btn-primary flex-1 py-2 text-xs font-bold"
+                                                        >
+                                                            {t("btn_equip")}
+                                                        </button>
+                                                    ) : (
+                                                        <button
+                                                            disabled={stats && stats.coins < previewItem.price}
+                                                            onClick={() => handleBuyAccessory(previewItem)}
+                                                            className="sm-btn-primary flex-1 py-2 text-xs font-bold disabled:opacity-50"
+                                                        >
+                                                            {t("btn_buy")} {previewItem.price} 🪙
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        onClick={handleCancelPreview}
+                                                        className="px-3 py-2 rounded-xl bg-white border border-[#F9DFDF] text-[#5A4A4A] text-xs font-bold hover:bg-[#FCF8F8]"
+                                                    >
+                                                        {t("cancel_preview")}
+                                                    </button>
+                                                </div>
                                             </div>
-                                            <span className="px-3 py-1 rounded-xl bg-black/55 backdrop-blur-md text-xs font-black text-amber-300">
-                                                {th.price === 0 ? t("shop_free") : `${th.price} 🪙`}
-                                            </span>
+                                        )}
+
+                                        <div className="space-y-1">
+                                            <h4 className="text-lg font-black text-[#2D2525]">{user ? user.character_name : "Minti"}</h4>
+                                            <p className="text-xs text-[#8C7777]">{t("minti_bio")}</p>
                                         </div>
-                                        <div className="p-5">
-                                            <p className="text-xs text-slate-400 leading-relaxed">
-                                                {lang === "fa" ? th.description_fa : th.description_en}
-                                            </p>
-                                        </div>
+
+                                        <button
+                                            onClick={() => setShowNameModal(true)}
+                                            className="sm-btn-secondary w-full text-xs font-bold"
+                                        >
+                                            ✏️ {t("minti_edit_name")}
+                                        </button>
                                     </div>
-                                    <div className="px-5 pb-5">
-                                        {th.is_active ? (
-                                            <button disabled className="w-full py-3 rounded-xl bg-emerald-500/20 text-emerald-300 text-xs font-bold">
-                                                ✨ {t("shop_equipped")}
-                                            </button>
-                                        ) : th.is_owned ? (
-                                            <button
-                                                onClick={async () => {
-                                                    await api("/shop/equip", { method: "POST", body: JSON.stringify({ theme_id: th.id }) });
-                                                    refreshAll();
-                                                }}
-                                                className="w-full tactile-btn py-3 rounded-xl text-xs"
-                                            >
-                                                {t("shop_equip")}
-                                            </button>
-                                        ) : (
-                                            <button
-                                                onClick={async (e) => {
-                                                    try {
-                                                        await api("/shop/buy", { method: "POST", body: JSON.stringify({ theme_id: th.id }) });
-                                                        await api("/shop/equip", { method: "POST", body: JSON.stringify({ theme_id: th.id }) });
-                                                        playSynthChime();
-                                                        spawnParticleBurst(e.clientX, e.clientY);
-                                                        refreshAll();
-                                                    } catch (err) {
-                                                        notify(err.message, "error");
-                                                    }
-                                                }}
-                                                className="w-full py-3 rounded-xl metallic-gold-badge text-xs transition hover:brightness-110"
-                                            >
-                                                {t("shop_buy")} {th.price} 🪙
-                                            </button>
+
+                                    {/* Right: Shop Catalog Tabs */}
+                                    <div className="lg:col-span-7 bg-white rounded-3xl p-6 sm:p-8 border border-[#F9DFDF] shadow-card space-y-6">
+                                        {/* Tabs with Jewelry category included */}
+                                        <div className="flex flex-wrap gap-2 border-b border-[#FBEFEF] pb-4">
+                                            {[
+                                                { id: "themes", label: t("tab_themes") },
+                                                { id: "outfits", label: t("tab_outfits") },
+                                                { id: "hats", label: t("tab_hats") },
+                                                { id: "glasses", label: t("tab_glasses") },
+                                                { id: "jewelry", label: t("tab_jewelry") },
+                                                { id: "accessories", label: t("tab_accessories") }
+                                            ].map(tab => (
+                                                <button
+                                                    key={tab.id}
+                                                    onClick={() => setShopTab(tab.id)}
+                                                    className={`px-4 py-2 rounded-2xl text-xs font-extrabold transition-all ${
+                                                        shopTab === tab.id
+                                                            ? "bg-[#F5AFAF] text-[#2D2525] shadow-sm"
+                                                            : "bg-[#FBEFEF] text-[#5A4A4A] hover:bg-[#F9DFDF]"
+                                                    }`}
+                                                >
+                                                    {tab.label}
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        {/* Themes Tab (Coin themes matching Image 2: Jungle, Night, Spring, Snow, Space) */}
+                                        {shopTab === "themes" && (
+                                            <div className="space-y-4">
+                                                {previewTheme && (
+                                                    <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-between text-xs font-bold text-amber-900">
+                                                        <span>🎨 در حال پیش‌نمایش رنگ‌های تم زنده</span>
+                                                        <button
+                                                            onClick={handleCancelThemePreview}
+                                                            className="px-3 py-1 rounded-xl bg-white border border-amber-300 text-xs font-bold hover:bg-amber-100"
+                                                        >
+                                                            بازگشت به تم قبلی
+                                                        </button>
+                                                    </div>
+                                                )}
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                    {themes.map(th => (
+                                                        <div
+                                                            key={th.id}
+                                                            className={`p-5 rounded-3xl border transition-all flex flex-col justify-between ${
+                                                                th.is_active
+                                                                    ? "border-emerald-400 bg-emerald-50/40"
+                                                                    : previewTheme === th.id
+                                                                    ? "border-[#F5AFAF] bg-[#FBEFEF] shadow-sm"
+                                                                    : "border-[#F9DFDF] bg-[#FCF8F8]"
+                                                            }`}
+                                                        >
+                                                            <div>
+                                                                <div className="flex items-center justify-between mb-2">
+                                                                    <div className="w-8 h-8 rounded-xl shadow-inner border" style={{ backgroundColor: th.preview_color }}></div>
+                                                                    <span className="text-[11px] font-black px-2 py-0.5 rounded-lg bg-[#FBEFEF]">
+                                                                        {th.price === 0 ? "رایگان" : `🪙 ${th.price}`}
+                                                                    </span>
+                                                                </div>
+                                                                <h5 className="font-black text-sm text-[#2D2525]">{th.name_fa}</h5>
+                                                                <p className="text-xs text-[#8C7777] mt-1">{th.description_fa}</p>
+                                                            </div>
+
+                                                            <div className="pt-3 flex items-center gap-2">
+                                                                <button
+                                                                    onClick={() => handlePreviewTheme(th.id)}
+                                                                    className="px-3 py-2 rounded-xl bg-white border border-[#F9DFDF] text-xs font-bold text-[#5A4A4A] hover:bg-[#FBEFEF]"
+                                                                >
+                                                                    پیش‌نمایش
+                                                                </button>
+                                                                {th.is_active ? (
+                                                                    <div className="flex-1 py-2 rounded-xl bg-emerald-50 text-emerald-700 text-xs font-black text-center border border-emerald-200">
+                                                                        ✓ {t("btn_equipped")}
+                                                                    </div>
+                                                                ) : th.is_owned ? (
+                                                                    <button
+                                                                        onClick={() => handleEquipTheme(th.id)}
+                                                                        className="sm-btn-secondary flex-1 text-xs font-bold py-2"
+                                                                    >
+                                                                        {t("btn_equip")}
+                                                                    </button>
+                                                                ) : (
+                                                                    <button
+                                                                        disabled={stats && stats.coins < th.price}
+                                                                        onClick={() => handleBuyTheme(th.id)}
+                                                                        className="sm-btn-primary flex-1 text-xs font-bold py-2 disabled:opacity-50"
+                                                                    >
+                                                                        {t("btn_buy")} {th.price} 🪙
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Accessories / Outfits / Hats / Glasses / Jewelry */}
+                                        {shopTab !== "themes" && (
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                {accessories
+                                                    .filter(a => (
+                                                        shopTab === "outfits" ? a.category === "outfit" :
+                                                        shopTab === "hats" ? a.category === "hat" :
+                                                        shopTab === "glasses" ? a.category === "glasses" :
+                                                        shopTab === "jewelry" ? a.category === "jewelry" :
+                                                        a.category === "accessory"
+                                                    ))
+                                                    .map(item => {
+                                                        const isTryingOn = previewItem && previewItem.id === item.id;
+                                                        const canAfford = stats && stats.coins >= item.price;
+                                                        return (
+                                                            <div
+                                                                key={item.id}
+                                                                onClick={() => handleTryOn(item)}
+                                                                className={`p-5 rounded-3xl border transition-all cursor-pointer flex flex-col justify-between ${
+                                                                    isTryingOn
+                                                                        ? "border-2 border-[#F5AFAF] bg-[#FBEFEF] shadow-sm transform scale-[1.01]"
+                                                                        : item.is_equipped
+                                                                        ? "border-emerald-300 bg-emerald-50/20"
+                                                                        : "border-[#F9DFDF] bg-[#FCF8F8] hover:border-[#F5AFAF]"
+                                                                }`}
+                                                            >
+                                                                <div>
+                                                                    <div className="flex items-center justify-between mb-2">
+                                                                        <span className="text-3xl">{item.icon}</span>
+                                                                        <div className="flex items-center gap-1.5">
+                                                                            {isTryingOn && (
+                                                                                <span className="text-[10px] font-black px-2 py-0.5 rounded-lg bg-rose-100 text-rose-700">
+                                                                                    در حال پرو
+                                                                                </span>
+                                                                            )}
+                                                                            <span className="text-[11px] font-black px-2 py-0.5 rounded-lg bg-[#FBEFEF]">
+                                                                                {item.price === 0 ? "رایگان" : `🪙 ${item.price}`}
+                                                                            </span>
+                                                                        </div>
+                                                                    </div>
+                                                                    <h5 className="font-black text-sm text-[#2D2525]">{item.name_fa}</h5>
+                                                                    <p className="text-xs text-[#8C7777] mt-1">{item.description_fa}</p>
+                                                                </div>
+
+                                                                <div className="pt-3 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                                                    <button
+                                                                        onClick={() => handleTryOn(item)}
+                                                                        className={`px-3 py-2 rounded-xl text-xs font-bold ${
+                                                                            isTryingOn ? "bg-[#F5AFAF] text-[#2D2525]" : "bg-white border border-[#F9DFDF] text-[#5A4A4A] hover:bg-[#FBEFEF]"
+                                                                        }`}
+                                                                    >
+                                                                        {t("try_on")}
+                                                                    </button>
+
+                                                                    {item.is_equipped ? (
+                                                                        <div className="flex-1 py-2 rounded-xl bg-emerald-50 text-emerald-700 text-xs font-black text-center border border-emerald-200">
+                                                                            ✓ {t("btn_equipped")}
+                                                                        </div>
+                                                                    ) : item.is_owned ? (
+                                                                        <button
+                                                                            onClick={() => handleEquipAccessory(item)}
+                                                                            className="sm-btn-secondary flex-1 text-xs font-bold py-2"
+                                                                        >
+                                                                            {t("btn_equip")}
+                                                                        </button>
+                                                                    ) : (
+                                                                        <button
+                                                                            disabled={!canAfford}
+                                                                            onClick={() => handleBuyAccessory(item)}
+                                                                            className="sm-btn-primary flex-1 text-xs font-bold py-2 disabled:opacity-50"
+                                                                        >
+                                                                            {t("btn_buy")} {item.price} 🪙
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                            </div>
                                         )}
                                     </div>
                                 </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {activeTab === "arena" && (
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                        <div className="lg:col-span-7 bento-card p-6 space-y-5">
-                            <div className="flex flex-wrap items-center justify-between gap-3">
-                                <div>
-                                    <h2 className="text-lg font-black">{t("arena_leaderboard")}</h2>
-                                    <p className="text-[11px] text-slate-400 mt-0.5">{t("click_profile_hint")}</p>
-                                </div>
-                                <div className="flex gap-1 bg-elevated p-1 rounded-xl">
-                                    {[
-                                        { id: "daily", label: t("tf_daily") },
-                                        { id: "weekly", label: t("tf_weekly") },
-                                        { id: "all_time", label: t("tf_all") }
-                                    ].map(tf => (
-                                        <button
-                                            key={tf.id}
-                                            onClick={() => loadArenaData(tf.id)}
-                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold ${lbTimeframe === tf.id ? "tactile-btn" : "text-slate-400"}`}
-                                        >
-                                            {tf.label}
-                                        </button>
-                                    ))}
-                                </div>
                             </div>
+                        );
+                    })()}
 
-                            <div className="space-y-3">
-                                {leaderboard.length === 0 ? (
-                                    <p className="text-xs text-slate-400">{t("no_leaderboard")}</p>
-                                ) : (
-                                    leaderboard.map(u => (
-                                        <div
-                                            key={u.user_id}
-                                            onClick={() => openUserProfile(u.user_id)}
-                                            className={`p-4 rounded-2xl text-white flex items-center justify-between cursor-pointer transform hover:scale-[1.01] transition aura-${u.active_theme || 'default'}`}
-                                        >
-                                            <div className="flex items-center gap-3.5">
-                                                <span className="text-xl font-black font-display w-7">#{u.rank}</span>
-                                                <div>
-                                                    <div className="flex flex-wrap items-center gap-2">
-                                                        <span className="font-extrabold text-sm underline decoration-white/40">{u.username}</span>
-                                                        <span className="px-2 py-0.5 rounded metallic-gold-badge text-[10px]">
-                                                            LVL {u.level || 1}
-                                                        </span>
-                                                        <span className="px-2 py-0.5 rounded metallic-platinum-badge text-[10px]">
-                                                            {lang === "fa" ? u.title_fa : u.title}
-                                                        </span>
-                                                    </div>
-                                                    <span className="text-[11px] opacity-85 block mt-1">
-                                                        ⏱️ {u.total_study_hours} {t("hours_short")} ({u.total_study_minutes} {t("mins_short")})
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            <span className="px-3 py-1 rounded-xl bg-black/50 border border-white/15 text-xs font-black text-amber-300">
-                                                {u.total_coins_earned} 🪙
-                                            </span>
+                    {/* 4. CHALLENGES & BOSS FIGHT VIEW (MATCHING REFERENCE IMAGE 2 MIDDLE RIGHT) */}
+                    {activeTab === "challenges" && (
+                        <div className="max-w-4xl mx-auto space-y-6">
+                            {weeklyChallenge ? (
+                                <div className="bg-white rounded-3xl p-8 border border-[#F9DFDF] shadow-card space-y-8 text-center">
+                                    <div>
+                                        <span className="px-3 py-1 rounded-xl bg-rose-50 text-rose-700 font-extrabold text-xs">
+                                            ⚔️ {t("weekly_challenge_title")}
+                                        </span>
+                                        <h3 className="text-3xl font-black text-[#2D2525] mt-2">{weeklyChallenge.boss_name_fa}</h3>
+                                        <p className="text-xs text-[#8C7777] mt-1">{weeklyChallenge.description_fa}</p>
+                                    </div>
+
+                                    {/* Boss Visual Avatar & Health Bar */}
+                                    <div className="max-w-md mx-auto space-y-4">
+                                        <div className="w-32 h-32 rounded-3xl bg-slate-900 mx-auto flex items-center justify-center text-5xl shadow-lg border-2 border-rose-300 animate-pulse-subtle">
+                                            👾
                                         </div>
-                                    ))
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="lg:col-span-5 space-y-5">
-                            <div className="bento-card p-6 space-y-4">
-                                <h3 className="text-lg font-black">{t("arena_groups")}</h3>
-                                <form
-                                    onSubmit={async (e) => {
-                                        e.preventDefault();
-                                        const fd = new FormData(e.target);
-                                        try {
-                                            await api("/groups", {
-                                                method: "POST",
-                                                body: JSON.stringify({ name: fd.get("name"), description: fd.get("description") })
-                                            });
-                                            e.target.reset();
-                                            loadArenaData(lbTimeframe);
-                                        } catch (err) {
-                                            notify(err.message, "error");
-                                        }
-                                    }}
-                                    className="space-y-2.5"
-                                >
-                                    <input name="name" required placeholder={t("group_name_ph")} className="w-full px-3.5 py-2.5 rounded-xl bg-elevated border border-slate-700/50 text-xs" />
-                                    <input name="description" placeholder={t("group_desc_ph")} className="w-full px-3.5 py-2.5 rounded-xl bg-elevated border border-slate-700/50 text-xs" />
-                                    <button type="submit" className="w-full tactile-btn py-2.5 rounded-xl text-xs">{t("group_create")}</button>
-                                </form>
-
-                                <form
-                                    onSubmit={async (e) => {
-                                        e.preventDefault();
-                                        const fd = new FormData(e.target);
-                                        try {
-                                            await api("/groups/join", {
-                                                method: "POST",
-                                                body: JSON.stringify({ invite_code: fd.get("invite_code") })
-                                            });
-                                            e.target.reset();
-                                            loadArenaData(lbTimeframe);
-                                        } catch (err) {
-                                            notify(err.message, "error");
-                                        }
-                                    }}
-                                    className="flex gap-2 pt-2 border-t border-slate-800"
-                                >
-                                    <input name="invite_code" required placeholder={t("group_code_ph")} className="flex-1 px-3.5 py-2 rounded-xl bg-elevated border border-slate-700/50 text-xs uppercase" />
-                                    <button type="submit" className="px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold">{t("group_join")}</button>
-                                </form>
-                            </div>
-
-                            {groups.map(g => {
-                                const raids = groupRaids[g.id] || [];
-                                const latestRaid = raids[0];
-
-                                return (
-                                    <div key={g.id} className="bento-card p-5 space-y-4">
-                                        <div className="flex justify-between items-center">
-                                            <div>
-                                                <h4 className="font-black text-base">{g.name}</h4>
-                                                {g.description && <p className="text-xs text-slate-400">{g.description}</p>}
-                                            </div>
-                                            <button
-                                                onClick={() => {
-                                                    navigator.clipboard.writeText(g.invite_code);
-                                                    notify(t("copied_code"));
-                                                }}
-                                                className="text-xs font-mono px-2.5 py-1 rounded bg-elevated text-accent border border-accent"
-                                            >
-                                                {g.invite_code}
-                                            </button>
-                                        </div>
-
-                                        <div className="p-4 rounded-2xl rim-light-boss bg-gradient-to-br from-red-950/50 via-zinc-950 to-zinc-950 space-y-3">
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-xs font-black text-red-400 flex items-center gap-1.5">
-                                                    <span>🐉</span>
-                                                    <span>{t("raid_title")}</span>
-                                                </span>
-                                            </div>
-
-                                            {latestRaid ? (
-                                                <div className="space-y-2.5">
-                                                    <div className="flex justify-between items-center">
-                                                        <span className="font-extrabold text-sm text-white">{latestRaid.boss_name}</span>
-                                                        <span className="text-xs px-2.5 py-0.5 rounded-lg metallic-gold-badge">
-                                                            🔒 +{latestRaid.reward_coins} 🪙
-                                                        </span>
-                                                    </div>
-
-                                                    {latestRaid.status === "defeated" ? (
-                                                        <div className="p-2 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-bold text-center">
-                                                            {t("raid_defeated")}
-                                                        </div>
-                                                    ) : (
-                                                        <div className="space-y-1">
-                                                            <div className="flex justify-between text-[11px] font-bold text-red-200">
-                                                                <span>BOSS HP</span>
-                                                                <span>{latestRaid.current_hp} / {latestRaid.max_hp} HP</span>
-                                                            </div>
-                                                            <div className="w-full h-3 bg-black/70 rounded-full overflow-hidden border border-red-500/40">
-                                                                <div
-                                                                    className="h-full bg-gradient-to-r from-red-600 via-orange-500 to-amber-400 transition-all duration-500"
-                                                                    style={{ width: `${Math.max(0, Math.min(100, (latestRaid.current_hp / latestRaid.max_hp) * 100))}%` }}
-                                                                ></div>
-                                                            </div>
-                                                        </div>
-                                                    )}
-
-                                                    {latestRaid.top_damage_dealers && latestRaid.top_damage_dealers.length > 0 && (
-                                                        <div className="pt-1 space-y-1">
-                                                            <span className="text-[10px] text-slate-400 font-bold block">{t("raid_top_dmg")}</span>
-                                                            <div className="flex flex-wrap gap-1.5">
-                                                                {latestRaid.top_damage_dealers.map((d, idx) => (
-                                                                    <button
-                                                                        key={idx}
-                                                                        type="button"
-                                                                        onClick={() => openUserProfile(d.user_id)}
-                                                                        className="text-[10px] px-2 py-0.5 rounded bg-red-500/20 hover:bg-red-500/40 text-red-200 font-bold transition"
-                                                                    >
-                                                                        ⚔️ {d.username}: {d.damage_dealt} DMG
-                                                                    </button>
-                                                                ))}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            ) : null}
-
-                                            {(!latestRaid || latestRaid.status === "defeated") && (
-                                                <RaidSummonForm
-                                                    groupId={g.id}
-                                                    lang={lang}
-                                                    t={t}
-                                                    api={api}
-                                                    notify={notify}
-                                                    onCreated={loadArenaData}
-                                                ></RaidSummonForm>
-                                            )}
-                                        </div>
-
                                         <div className="space-y-1.5">
-                                            <span className="text-[10px] font-bold text-slate-400 block">{t("squad_members")}</span>
-                                            {g.members.map((m, i) => (
+                                            <div className="w-full bg-[#FBEFEF] rounded-full h-4 overflow-hidden border border-[#F9DFDF]">
                                                 <div
-                                                    key={m.user_id}
-                                                    onClick={() => openUserProfile(m.user_id)}
-                                                    className={`p-2.5 rounded-xl text-white text-xs flex items-center justify-between cursor-pointer hover:scale-[1.01] transition aura-${m.active_theme || 'default'}`}
-                                                >
-                                                    <div className="flex flex-wrap items-center gap-1.5">
-                                                        <span className="font-extrabold underline decoration-white/40">{i + 1}. {m.username} {m.is_owner ? "👑" : ""}</span>
-                                                        <span className="px-1.5 py-0.5 rounded metallic-gold-badge text-[9px]">
-                                                            LVL {m.level || 1}
-                                                        </span>
-                                                        <span className="text-[10px] opacity-90">
-                                                            ({lang === "fa" ? m.title_fa : m.title})
-                                                        </span>
+                                                    className="bg-rose-500 h-full rounded-full transition-all duration-700"
+                                                    style={{ width: `${weeklyChallenge.hp_percentage}%` }}
+                                                />
+                                            </div>
+                                            <div className="flex justify-between text-xs font-bold text-[#5A4A4A]">
+                                                <span>جان باس: {weeklyChallenge.current_hp} / {weeklyChallenge.max_hp}</span>
+                                                <span>{weeklyChallenge.hp_percentage}% باقی‌مانده</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* User Contribution Card */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-lg mx-auto text-start">
+                                        <div className="p-4 rounded-2xl bg-[#FCF8F8] border border-[#F9DFDF]">
+                                            <p className="text-xs text-[#8C7777] font-semibold">ضربه وارد شده توسط شما:</p>
+                                            <p className="text-xl font-black text-rose-600 mt-1">{weeklyChallenge.user_damage} HP</p>
+                                            <p className="text-[11px] text-[#8C7777]">({weeklyChallenge.user_contribution_percentage}% از کل ضربات)</p>
+                                        </div>
+                                        <div className="p-4 rounded-2xl bg-[#FCF8F8] border border-[#F9DFDF]">
+                                            <p className="text-xs text-[#8C7777] font-semibold">پاداش تیمی شکست غول:</p>
+                                            <p className="text-xl font-black text-amber-600 mt-1">🪙 {weeklyChallenge.reward_coins} + ⭐ {weeklyChallenge.reward_xp}</p>
+                                            <p className="text-[11px] text-[#8C7777]">{weeklyChallenge.days_remaining} روز تا پایان چالش</p>
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        onClick={() => setActiveTab("study")}
+                                        className="sm-btn-primary px-10 py-3.5 text-sm shadow-soft"
+                                    >
+                                        حمله با تایمر مطالعه (ادامه مبارزه) ⚔️
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="bg-white rounded-3xl p-12 border border-[#F9DFDF] shadow-card text-center space-y-4">
+                                    <span className="text-4xl animate-bounce inline-block">⚔️</span>
+                                    <h4 className="text-lg font-black text-[#2D2525]">در حال بارگذاری چالش هفتگی...</h4>
+                                    <button onClick={fetchAllData} className="sm-btn-secondary text-xs px-5 py-2">بارگذاری مجدد</button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* 5. FRIENDS & CLANS VIEW (MATCHING REFERENCE IMAGE 2 MIDDLE CENTER) */}
+                    {activeTab === "friends" && (
+                        <div className="max-w-4xl mx-auto space-y-6">
+                            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#F9DFDF] shadow-card space-y-6">
+                                {/* Search Bar */}
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        value={searchUserQuery}
+                                        onChange={(e) => handleSearchUsers(e.target.value)}
+                                        placeholder={t("search_users_ph")}
+                                        className="w-full px-5 py-3.5 rounded-2xl bg-[#FBEFEF] border border-[#F9DFDF] text-xs font-bold text-[#2D2525] focus:outline-none focus:border-[#F5AFAF]"
+                                    />
+                                    {searchResults.length > 0 && (
+                                        <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl border border-[#F9DFDF] shadow-lg p-3 z-20 space-y-2">
+                                            {searchResults.map(sr => (
+                                                <div key={sr.id} className="flex items-center justify-between p-2 rounded-xl hover:bg-[#FBEFEF]">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-8 h-8 rounded-xl bg-[#F5AFAF] flex items-center justify-center font-bold text-xs">
+                                                            {sr.username[0].toUpperCase()}
+                                                        </div>
+                                                        <div>
+                                                            <p className="font-extrabold text-xs text-[#2D2525]">{sr.username}</p>
+                                                            <p className="text-[11px] text-[#8C7777]">{sr.character_name}</p>
+                                                        </div>
                                                     </div>
-                                                    <span className="font-bold shrink-0">{m.total_study_hours} {t("hours_short")}</span>
+                                                    <button
+                                                        onClick={() => handleFriendAction("send", sr.username)}
+                                                        className="sm-btn-primary text-xs px-3 py-1.5"
+                                                    >
+                                                        {t("btn_add_friend")}
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Pending Requests */}
+                                {friendRequests.length > 0 && (
+                                    <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 space-y-3">
+                                        <h5 className="font-extrabold text-xs text-amber-800">درخواست‌های دوستی دریافتی ({friendRequests.length})</h5>
+                                        <div className="space-y-2">
+                                            {friendRequests.map(fr => (
+                                                <div key={fr.id} className="flex items-center justify-between p-3 rounded-xl bg-white border border-amber-100">
+                                                    <div>
+                                                        <p className="font-bold text-xs text-[#2D2525]">{fr.sender_username}</p>
+                                                        <p className="text-[10px] text-[#8C7777]">{fr.character_name}</p>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            onClick={() => handleFriendAction("accept", null, fr.id)}
+                                                            className="px-3 py-1.5 rounded-xl bg-emerald-500 text-white font-bold text-xs"
+                                                        >
+                                                            {t("btn_accept")}
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleFriendAction("reject", null, fr.id)}
+                                                            className="px-3 py-1.5 rounded-xl bg-rose-100 text-rose-700 font-bold text-xs"
+                                                        >
+                                                            {t("btn_reject")}
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             ))}
                                         </div>
                                     </div>
-                                );
-                            })}
+                                )}
+
+                                {/* Friends Cards List */}
+                                <div className="space-y-3">
+                                    <h5 className="font-black text-sm text-[#2D2525]">{t("tab_friends_list")} ({friends.length})</h5>
+                                    {friends.length > 0 ? (
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            {friends.map(f => (
+                                                <div key={f.id} className="p-4 rounded-3xl bg-[#FCF8F8] border border-[#F9DFDF] flex items-center justify-between">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="relative">
+                                                            <div className="w-12 h-12 rounded-2xl bg-white border border-[#F9DFDF] flex items-center justify-center font-black text-sm">
+                                                                {f.username[0].toUpperCase()}
+                                                            </div>
+                                                            <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-emerald-400 border-2 border-white"></span>
+                                                        </div>
+                                                        <div>
+                                                            <div className="flex items-center gap-1.5">
+                                                                <span className="font-extrabold text-sm text-[#2D2525]">{f.username}</span>
+                                                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-[#FBEFEF] text-[#8C7777]">Lv.{f.level}</span>
+                                                            </div>
+                                                            <p className="text-xs text-[#8C7777]">{f.character_name} 🌱 • {f.study_hours}h مطالعه</p>
+                                                        </div>
+                                                    </div>
+
+                                                    <button
+                                                        onClick={() => handleFriendAction("remove", f.id)}
+                                                        className="text-xs text-rose-500 hover:text-rose-700 font-bold px-2 py-1"
+                                                        title={t("btn_remove")}
+                                                    >
+                                                        ✕
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <p className="text-xs text-[#8C7777] text-center py-6">هنوز دوستی به لیست شما اضافه نشده است. با کادر بالا دوستانتان را جستجو کنید!</p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 6. REFERRALS & PREMIUM VIEW */}
+                    {activeTab === "referrals" && referralInfo && (
+                        <div className="max-w-3xl mx-auto space-y-6">
+                            <div className="bg-white rounded-3xl p-8 border border-[#F9DFDF] shadow-card space-y-6 text-center">
+                                <div className="w-16 h-16 rounded-3xl bg-[#F5AFAF] mx-auto flex items-center justify-center text-3xl shadow-soft">
+                                    🎁
+                                </div>
+                                <div>
+                                    <h3 className="text-2xl font-black text-[#2D2525]">{t("referrals_title")}</h3>
+                                    <p className="text-xs text-[#8C7777] mt-1 max-w-md mx-auto">{t("referrals_hero_text")}</p>
+                                </div>
+
+                                <div className="p-6 rounded-3xl bg-[#FCF8F8] border border-[#F9DFDF] max-w-md mx-auto space-y-4">
+                                    <div>
+                                        <p className="text-xs font-bold text-[#8C7777]">{t("my_referral_code")}</p>
+                                        <p className="text-2xl font-black text-[#2D2525] tracking-widest mt-1">{referralInfo.referral_code}</p>
+                                    </div>
+                                    <div className="flex items-center justify-center gap-3">
+                                        <button
+                                            onClick={() => { navigator.clipboard.writeText(referralInfo.referral_code); notify("کد معرف کپی شد!", "success"); }}
+                                            className="sm-btn-primary text-xs py-2 px-5"
+                                        >
+                                            {t("copy_code")}
+                                        </button>
+                                        <button
+                                            onClick={() => { navigator.clipboard.writeText(referralInfo.referral_link); notify("لینک دعوت کپی شد!", "success"); }}
+                                            className="sm-btn-secondary text-xs py-2 px-5"
+                                        >
+                                            {t("copy_link")}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4 max-w-md mx-auto text-start">
+                                    <div className="p-4 rounded-2xl bg-[#FBEFEF]">
+                                        <p className="text-xs text-[#8C7777]">{t("successful_referrals")}</p>
+                                        <p className="text-xl font-black text-[#2D2525] mt-1">{referralInfo.successful_referrals_count} نفر</p>
+                                    </div>
+                                    <div className="p-4 rounded-2xl bg-[#FBEFEF]">
+                                        <p className="text-xs text-[#8C7777]">{t("premium_status")}</p>
+                                        <p className="text-sm font-black text-[#2D2525] mt-1">
+                                            {referralInfo.is_premium ? t("premium_active") : t("premium_free")}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="pt-2 max-w-md mx-auto">
+                                    <button
+                                        onClick={() => setShowAchievementModal(true)}
+                                        className="sm-btn-secondary w-full py-3 text-xs font-bold flex items-center justify-center gap-2"
+                                    >
+                                        <span>🌟</span>
+                                        <span>{t("share_achievement")}</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 7. PROGRESS REPORTS & STUDY ANALYTICS DASHBOARD */}
+                    {activeTab === "reports" && (() => {
+                        const now = new Date();
+                        const periodDays = reportsPeriod === "week" ? 7 : reportsPeriod === "month" ? 30 : 9999;
+                        const cutoffDate = new Date(now.getTime() - periodDays * 24 * 60 * 60 * 1000);
+                        const prevCutoffDate = new Date(now.getTime() - periodDays * 2 * 24 * 60 * 60 * 1000);
+
+                        const filteredSessions = sessions.filter(s => {
+                            const sDate = new Date(s.ended_at || s.started_at);
+                            return sDate >= cutoffDate;
+                        });
+
+                        const prevSessions = sessions.filter(s => {
+                            const sDate = new Date(s.ended_at || s.started_at);
+                            return sDate >= prevCutoffDate && sDate < cutoffDate;
+                        });
+
+                        // 1. Total study time & period comparison
+                        const currentMins = filteredSessions.reduce((acc, s) => acc + (s.duration_minutes || 0), 0);
+                        const prevMins = prevSessions.reduce((acc, s) => acc + (s.duration_minutes || 0), 0);
+                        const totalHours = Math.floor(currentMins / 60);
+                        const remainingMins = currentMins % 60;
+
+                        let periodComparisonText = t("period_first");
+                        let periodComparisonClass = "bg-[#FBEFEF] text-[#8C7777]";
+                        if (prevMins > 0) {
+                            const pctDiff = Math.round(((currentMins - prevMins) / prevMins) * 100);
+                            if (pctDiff > 0) {
+                                periodComparisonText = `+${pctDiff}% ${t("period_comparison_positive")}`;
+                                periodComparisonClass = "bg-emerald-100 text-emerald-800";
+                            } else if (pctDiff < 0) {
+                                periodComparisonText = `${pctDiff}% ${t("period_comparison_negative")}`;
+                                periodComparisonClass = "bg-rose-100 text-rose-800";
+                            } else {
+                                periodComparisonText = "بدون تغییر نسبت به دوره قبل";
+                                periodComparisonClass = "bg-slate-100 text-slate-700";
+                            }
+                        }
+
+                        // 2. Count & averages
+                        const sessionsCount = filteredSessions.length;
+                        const avgDuration = sessionsCount > 0 ? Math.round(currentMins / sessionsCount) : 0;
+                        const activeDaysSet = new Set(filteredSessions.map(s => (s.ended_at || s.started_at || "").slice(0, 10)));
+                        const activeDaysCount = activeDaysSet.size;
+
+                        // 3. Peak Day Calculation
+                        const dayNamesFa = ["یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه", "شنبه"];
+                        const dayTotals = [0, 0, 0, 0, 0, 0, 0];
+                        filteredSessions.forEach(s => {
+                            const dt = new Date(s.ended_at || s.started_at);
+                            if (!isNaN(dt)) dayTotals[dt.getDay()] += (s.duration_minutes || 0);
+                        });
+                        let peakDayIdx = 0;
+                        for (let i = 1; i < 7; i++) {
+                            if (dayTotals[i] > dayTotals[peakDayIdx]) peakDayIdx = i;
+                        }
+                        const peakDayName = dayTotals[peakDayIdx] > 0 ? dayNamesFa[peakDayIdx] : "-";
+                        const peakDayMins = dayTotals[peakDayIdx];
+
+                        // 4. Daily Study Trend (Last 7 Days)
+                        const last7Days = [];
+                        for (let i = 6; i >= 0; i--) {
+                            const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+                            const dateStr = d.toISOString().slice(0, 10);
+                            const daySessions = sessions.filter(s => (s.ended_at || s.started_at || "").slice(0, 10) === dateStr);
+                            const dayMins = daySessions.reduce((acc, s) => acc + (s.duration_minutes || 0), 0);
+                            last7Days.push({
+                                dateStr,
+                                dayLabel: dayNamesFa[d.getDay()].slice(0, 2),
+                                dayMins,
+                                fullDayName: dayNamesFa[d.getDay()]
+                            });
+                        }
+                        const maxDayMins = Math.max(...last7Days.map(d => d.dayMins), 60);
+
+                        // 5. Subject / Course Breakdown
+                        const courseBreakdown = {};
+                        filteredSessions.forEach(s => {
+                            const cName = s.course_name || s.topic || "مطالعه آزاد";
+                            courseBreakdown[cName] = (courseBreakdown[cName] || 0) + (s.duration_minutes || 0);
+                        });
+                        const courseBreakdownList = Object.entries(courseBreakdown).map(([name, mins]) => ({
+                            name,
+                            mins,
+                            percent: currentMins > 0 ? Math.round((mins / currentMins) * 100) : 0
+                        })).sort((a, b) => b.mins - a.mins);
+
+                        // 6. Session Duration Classification
+                        const shortSessions = filteredSessions.filter(s => s.duration_minutes < 25).length;
+                        const standardSessions = filteredSessions.filter(s => s.duration_minutes >= 25 && s.duration_minutes <= 50).length;
+                        const deepSessions = filteredSessions.filter(s => s.duration_minutes > 50).length;
+
+                        // 7. Selected Heatmap Day Details
+                        const selectedDaySessions = selectedHeatmapDay
+                            ? sessions.filter(s => (s.ended_at || s.started_at || "").slice(0, 10) === selectedHeatmapDay.date)
+                            : [];
+
+                        // 8. Streak Milestones Unlocked Status
+                        const curStreak = stats ? stats.current_streak : 0;
+                        const milestones = [
+                            { days: 3, title: "جوانه تمرکز", icon: "🌱", desc: "۳ روز استریک پیاپی" },
+                            { days: 7, title: "جنگجوی هفتگی", icon: "⚔️", desc: "۷ روز تعهد و استمرار" },
+                            { days: 14, title: "عادت پولادین", icon: "🛡️", desc: "۱۴ روز مطالعه مداوم" },
+                            { days: 30, title: "ارباب استادی‌میت", icon: "👑", desc: "یک ماه عادت ناگسستنی" }
+                        ];
+
+                        return (
+                            <div className="max-w-5xl mx-auto space-y-6">
+                                {/* Header & Period Selector */}
+                                <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#F9DFDF] shadow-card flex flex-col md:flex-row items-center justify-between gap-4">
+                                    <div className="text-start space-y-1">
+                                        <h3 className="text-2xl font-black text-[#2D2525]">{t("reports_title")}</h3>
+                                        <p className="text-xs text-[#8C7777]">{t("reports_sub")}</p>
+                                    </div>
+
+                                    {/* Period Pills */}
+                                    <div className="flex items-center gap-1.5 p-1.5 rounded-2xl bg-[#FBEFEF] border border-[#F9DFDF]">
+                                        {[
+                                            { id: "week", label: t("period_week") },
+                                            { id: "month", label: t("period_month") },
+                                            { id: "all", label: t("period_all") }
+                                        ].map(p => (
+                                            <button
+                                                key={p.id}
+                                                onClick={() => setReportsPeriod(p.id)}
+                                                className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${
+                                                    reportsPeriod === p.id
+                                                        ? "bg-[#F5AFAF] text-[#2D2525] shadow-sm"
+                                                        : "text-[#5A4A4A] hover:bg-white"
+                                                }`}
+                                            >
+                                                {p.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Empty State if No Sessions Exist */}
+                                {sessions.length === 0 ? (
+                                    <div className="bg-white rounded-3xl p-10 border border-[#F9DFDF] shadow-card text-center space-y-6 max-w-lg mx-auto">
+                                        <div className="w-24 h-24 rounded-full bg-[#FBEFEF] mx-auto flex items-center justify-center text-5xl">
+                                            🌱
+                                        </div>
+                                        <div className="space-y-2">
+                                            <h4 className="text-xl font-black text-[#2D2525]">{t("empty_reports_title")}</h4>
+                                            <p className="text-xs text-[#8C7777] leading-relaxed">{t("empty_reports_desc")}</p>
+                                        </div>
+                                        <button
+                                            onClick={() => setActiveTab("study")}
+                                            className="sm-btn-primary px-8 py-3 text-xs font-bold shadow-soft"
+                                        >
+                                            ⏱️ {t("start_first_session")}
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <>
+                                        {/* 4 Summary Cards */}
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                            {/* Card 1: Total Study Time */}
+                                            <div className="p-5 rounded-3xl bg-white border border-[#F9DFDF] shadow-card space-y-3">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-2xl">⏳</span>
+                                                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg ${periodComparisonClass}`}>
+                                                        {periodComparisonText}
+                                                    </span>
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs font-bold text-[#8C7777]">{t("stat_total_time")}</p>
+                                                    <h4 className="text-2xl font-black text-[#2D2525] mt-1">
+                                                        {totalHours > 0 ? `${totalHours}h ` : ""}{remainingMins}m
+                                                    </h4>
+                                                </div>
+                                                <p className="text-[11px] text-[#8C7777]">مجموع {currentMins} دقیقه تمرکز عمیق</p>
+                                            </div>
+
+                                            {/* Card 2: Completed Sessions */}
+                                            <div className="p-5 rounded-3xl bg-white border border-[#F9DFDF] shadow-card space-y-3">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-2xl">🎯</span>
+                                                    <span className="text-[10px] font-black px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-700">
+                                                        تکمیل شده
+                                                    </span>
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs font-bold text-[#8C7777]">{t("stat_sessions_count")}</p>
+                                                    <h4 className="text-2xl font-black text-[#2D2525] mt-1">
+                                                        {sessionsCount} جلسه
+                                                    </h4>
+                                                </div>
+                                                <p className="text-[11px] text-[#8C7777]">در دوره انتخابی</p>
+                                            </div>
+
+                                            {/* Card 3: Avg Duration */}
+                                            <div className="p-5 rounded-3xl bg-white border border-[#F9DFDF] shadow-card space-y-3">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-2xl">⚡</span>
+                                                    <span className="text-[10px] font-black px-2 py-0.5 rounded-lg bg-amber-50 text-amber-700">
+                                                        پومودورو
+                                                    </span>
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs font-bold text-[#8C7777]">{t("stat_avg_duration")}</p>
+                                                    <h4 className="text-2xl font-black text-[#2D2525] mt-1">
+                                                        {avgDuration} دقیقه
+                                                    </h4>
+                                                </div>
+                                                <p className="text-[11px] text-[#8C7777]">میانگین زمان هر بلاک تمرکز</p>
+                                            </div>
+
+                                            {/* Card 4: Active Days & Streak */}
+                                            <div className="p-5 rounded-3xl bg-white border border-[#F9DFDF] shadow-card space-y-3">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-2xl">🔥</span>
+                                                    <span className="text-[10px] font-black px-2 py-0.5 rounded-lg bg-rose-50 text-rose-700">
+                                                        استریک {curStreak} روز
+                                                    </span>
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs font-bold text-[#8C7777]">{t("stat_active_days")}</p>
+                                                    <h4 className="text-2xl font-black text-[#2D2525] mt-1">
+                                                        {activeDaysCount} روز فعال
+                                                    </h4>
+                                                </div>
+                                                <p className="text-[11px] text-[#8C7777]">
+                                                    بهترین استریک: {stats ? stats.longest_streak || curStreak : 0} روز
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {/* Row 2: Charts & Productive Insights */}
+                                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                                            {/* Left: 7-Day Study Minutes Bar Chart (8 Cols) */}
+                                            <div className="lg:col-span-8 bg-white rounded-3xl p-6 sm:p-8 border border-[#F9DFDF] shadow-card space-y-6">
+                                                <div className="flex items-center justify-between">
+                                                    <div>
+                                                        <h4 className="font-black text-base text-[#2D2525]">روند ۷ روز اخیر مطالعه</h4>
+                                                        <p className="text-xs text-[#8C7777]">دقایق مطالعه ثبت‌شده روزانه</p>
+                                                    </div>
+                                                    <div className="text-end">
+                                                        <span className="text-xs font-bold text-[#8C7777]">پربازده‌ترین روز:</span>
+                                                        <span className="text-xs font-black text-emerald-700 mx-1">{peakDayName}</span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Responsive SVG Bar Chart */}
+                                                <div className="pt-4">
+                                                    <div className="h-44 flex items-end justify-between gap-3 px-2 border-b border-[#FBEFEF] pb-2">
+                                                        {last7Days.map((day, idx) => {
+                                                            const barHeightPct = Math.max(8, Math.round((day.dayMins / maxDayMins) * 100));
+                                                            const isPeak = day.dayMins > 0 && day.dayMins === Math.max(...last7Days.map(d => d.dayMins));
+                                                            return (
+                                                                <div key={idx} className="flex-1 flex flex-col items-center gap-2 h-full justify-end group">
+                                                                    <span className="text-[10px] font-black text-[#8C7777] opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                        {day.dayMins}m
+                                                                    </span>
+                                                                    <div
+                                                                        style={{ height: `${barHeightPct}%` }}
+                                                                        className={`w-full rounded-2xl transition-all duration-500 relative ${
+                                                                            isPeak
+                                                                                ? "bg-[#F5AFAF] shadow-soft"
+                                                                                : day.dayMins > 0
+                                                                                ? "bg-[#F9DFDF] hover:bg-[#F5AFAF]"
+                                                                                : "bg-[#FBEFEF]"
+                                                                        }`}
+                                                                        title={`${day.fullDayName}: ${day.dayMins} دقیقه`}
+                                                                    />
+                                                                    <span className="text-xs font-extrabold text-[#5A4A4A] mt-1">
+                                                                        {day.dayLabel}
+                                                                    </span>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Right: Goals & Session Types Breakdown (4 Cols) */}
+                                            <div className="lg:col-span-4 bg-white rounded-3xl p-6 sm:p-8 border border-[#F9DFDF] shadow-card space-y-6 flex flex-col justify-between">
+                                                <div>
+                                                    <h4 className="font-black text-base text-[#2D2525]">اهداف و تمرکز</h4>
+                                                    <p className="text-xs text-[#8C7777]">عملکرد روزانه و هفتگی</p>
+                                                </div>
+
+                                                {/* Daily Goal Bar */}
+                                                <div className="space-y-1.5">
+                                                    <div className="flex justify-between text-xs font-extrabold">
+                                                        <span className="text-[#2D2525]">{t("today_goal")} (۲ ساعت)</span>
+                                                        <span className="text-emerald-700">{stats ? stats.today_goal_percentage : 0}%</span>
+                                                    </div>
+                                                    <div className="w-full bg-[#FBEFEF] rounded-full h-3 overflow-hidden border border-[#F9DFDF]">
+                                                        <div
+                                                            className="bg-[#F5AFAF] h-full rounded-full transition-all duration-500"
+                                                            style={{ width: `${Math.min(100, stats ? stats.today_goal_percentage : 0)}%` }}
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                {/* Weekly Goal Bar */}
+                                                <div className="space-y-1.5">
+                                                    <div className="flex justify-between text-xs font-extrabold">
+                                                        <span className="text-[#2D2525]">{t("weekly_goal")} (۲۰ ساعت)</span>
+                                                        <span className="text-emerald-700">{stats ? stats.weekly_goal_percentage : 0}%</span>
+                                                    </div>
+                                                    <div className="w-full bg-[#FBEFEF] rounded-full h-3 overflow-hidden border border-[#F9DFDF]">
+                                                        <div
+                                                            className="bg-emerald-400 h-full rounded-full transition-all duration-500"
+                                                            style={{ width: `${Math.min(100, stats ? stats.weekly_goal_percentage : 0)}%` }}
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                {/* Session Duration Distribution */}
+                                                <div className="pt-2 border-t border-[#FBEFEF] space-y-2">
+                                                    <span className="text-xs font-bold text-[#8C7777] block">{t("duration_breakdown")}</span>
+                                                    <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                                                        <div className="p-2 rounded-xl bg-[#FCF8F8] border border-[#F9DFDF]">
+                                                            <p className="font-black text-[#2D2525]">{shortSessions}</p>
+                                                            <p className="text-[10px] text-[#8C7777]">&lt; ۲۵ دقیقه</p>
+                                                        </div>
+                                                        <div className="p-2 rounded-xl bg-[#FBEFEF] border border-[#F9DFDF]">
+                                                            <p className="font-black text-[#2D2525]">{standardSessions}</p>
+                                                            <p className="text-[10px] text-[#8C7777]">۲۵-۵۰ دقیقه</p>
+                                                        </div>
+                                                        <div className="p-2 rounded-xl bg-[#F9DFDF] border border-[#F5AFAF]">
+                                                            <p className="font-black text-[#2D2525]">{deepSessions}</p>
+                                                            <p className="text-[10px] text-[#8C7777]">&gt; ۵۰ دقیقه</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Row 3: Subject Breakdown & Activity Heatmap Matrix */}
+                                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                                            {/* Subject Breakdown (5 Cols) */}
+                                            <div className="lg:col-span-5 bg-white rounded-3xl p-6 sm:p-8 border border-[#F9DFDF] shadow-card space-y-4">
+                                                <div>
+                                                    <h4 className="font-black text-base text-[#2D2525]">{t("subject_distribution")}</h4>
+                                                    <p className="text-xs text-[#8C7777]">تفکیک زمان مطالعه بر حسب دروس</p>
+                                                </div>
+
+                                                <div className="space-y-3 pt-2">
+                                                    {courseBreakdownList.length > 0 ? (
+                                                        courseBreakdownList.map((c, i) => (
+                                                            <div key={i} className="space-y-1">
+                                                                <div className="flex justify-between text-xs font-bold text-[#2D2525]">
+                                                                    <span>{c.name}</span>
+                                                                    <span>{Math.floor(c.mins / 60)}h {c.mins % 60}m ({c.percent}%)</span>
+                                                                </div>
+                                                                <div className="w-full bg-[#FBEFEF] rounded-full h-2.5 overflow-hidden">
+                                                                    <div
+                                                                        className="h-full rounded-full transition-all duration-500"
+                                                                        style={{
+                                                                            width: `${c.percent}%`,
+                                                                            backgroundColor: i === 0 ? "#F5AFAF" : i === 1 ? "#38BDF8" : i === 2 ? "#4ADE80" : "#FBBF24"
+                                                                        }}
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        ))
+                                                    ) : (
+                                                        <p className="text-xs text-[#8C7777]">هنوز درسی ثبت نشده است.</p>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Activity Calendar Matrix Heatmap (7 Cols) */}
+                                            <div className="lg:col-span-7 bg-white rounded-3xl p-6 sm:p-8 border border-[#F9DFDF] shadow-card space-y-4">
+                                                <div className="flex items-center justify-between">
+                                                    <div>
+                                                        <h4 className="font-black text-base text-[#2D2525]">{t("heatmap_activity_calendar")}</h4>
+                                                        <p className="text-xs text-[#8C7777]">برای مشاهده جزئیات هر روز، روی خانه آن کلیک کنید</p>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#8C7777]">
+                                                        <span>کمتر</span>
+                                                        <div className="w-2.5 h-2.5 rounded-sm bg-[#FBEFEF]" />
+                                                        <div className="w-2.5 h-2.5 rounded-sm bg-emerald-200" />
+                                                        <div className="w-2.5 h-2.5 rounded-sm bg-emerald-400" />
+                                                        <div className="w-2.5 h-2.5 rounded-sm bg-emerald-600" />
+                                                        <span>بیشتر</span>
+                                                    </div>
+                                                </div>
+
+                                                {/* 12-Week Matrix */}
+                                                <div className="p-4 rounded-2xl bg-[#FCF8F8] border border-[#F9DFDF] overflow-x-auto">
+                                                    <div className="flex flex-wrap gap-1.5">
+                                                        {heatmap.slice(-84).map((entry, idx) => {
+                                                            const mins = entry ? entry.minutes : 0;
+                                                            const bgCol = mins > 90 ? "bg-emerald-600 shadow-sm" :
+                                                                          mins > 50 ? "bg-emerald-400" :
+                                                                          mins > 0 ? "bg-emerald-200" : "bg-[#FBEFEF]";
+                                                            const isSelected = selectedHeatmapDay && selectedHeatmapDay.date === entry.date;
+                                                            return (
+                                                                <div
+                                                                    key={idx}
+                                                                    onClick={() => setSelectedHeatmapDay(entry)}
+                                                                    className={`w-3.5 h-3.5 rounded-sm cursor-pointer transition-transform hover:scale-125 ${bgCol} ${
+                                                                        isSelected ? "ring-2 ring-[#F5AFAF] ring-offset-1" : ""
+                                                                    }`}
+                                                                    title={`${entry.date}: ${mins} دقیقه مطالعه (${entry.sessions_count || 0} جلسه)`}
+                                                                />
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+
+                                                {/* Selected Day Details Pane */}
+                                                {selectedHeatmapDay && (
+                                                    <div className="p-3.5 rounded-2xl bg-[#FBEFEF] border border-[#F9DFDF] text-xs space-y-2 animate-fade-in">
+                                                        <div className="flex items-center justify-between font-bold text-[#2D2525]">
+                                                            <span>📅 تاریخ: {selectedHeatmapDay.date}</span>
+                                                            <span className="font-black text-emerald-800">
+                                                                {selectedHeatmapDay.minutes} دقیقه مطالعه ({selectedDaySessions.length} جلسه)
+                                                            </span>
+                                                        </div>
+                                                        {selectedDaySessions.length > 0 ? (
+                                                            <div className="space-y-1">
+                                                                {selectedDaySessions.map(s => (
+                                                                    <div key={s.id} className="flex justify-between text-[11px] text-[#5A4A4A] bg-white p-2 rounded-xl">
+                                                                        <span>{s.topic || s.course_name || "جلسه تمرکز"}</span>
+                                                                        <span className="font-bold">{s.duration_minutes} دقیقه</span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        ) : (
+                                                            <p className="text-[11px] text-[#8C7777]">جزئیات بیشتری برای این تاریخ ثبت نشده است.</p>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Row 4: Streak Milestones & Honor Badges */}
+                                        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#F9DFDF] shadow-card space-y-4">
+                                            <div>
+                                                <h4 className="font-black text-base text-[#2D2525]">{t("streak_milestones")}</h4>
+                                                <p className="text-xs text-[#8C7777]">نشان‌های افتخار استمرار که با مطالعه منظم باز می‌شوند</p>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
+                                                {milestones.map((m, i) => {
+                                                    const isUnlocked = curStreak >= m.days;
+                                                    return (
+                                                        <div
+                                                            key={i}
+                                                            className={`p-4 rounded-2xl border transition-all text-center space-y-2 ${
+                                                                isUnlocked
+                                                                    ? "border-amber-300 bg-amber-50/40 shadow-sm"
+                                                                    : "border-[#F9DFDF] bg-[#FCF8F8] opacity-60"
+                                                            }`}
+                                                        >
+                                                            <span className="text-3xl block">{m.icon}</span>
+                                                            <h5 className="font-black text-sm text-[#2D2525]">{m.title}</h5>
+                                                            <p className="text-[11px] text-[#8C7777]">{m.desc}</p>
+                                                            <div className="pt-1">
+                                                                {isUnlocked ? (
+                                                                    <span className="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-extrabold text-[10px]">
+                                                                        ✓ باز شده
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 font-bold text-[10px]">
+                                                                        🔒 نیاز به {m.days - curStreak} روز دیگر
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        );
+                    })()}
+
+                    {/* 8. LEADERBOARD VIEW */}
+                    {activeTab === "leaderboard" && (
+                        <div className="max-w-4xl mx-auto space-y-6">
+                            <div className="bg-white rounded-3xl p-8 border border-[#F9DFDF] shadow-card space-y-6">
+                                <h3 className="text-xl font-black text-[#2D2525]">{t("leaderboard_title")}</h3>
+                                <div className="space-y-3">
+                                    {leaderboard.map((u, i) => (
+                                        <div key={u.user_id} className="flex items-center justify-between p-4 rounded-2xl bg-[#FCF8F8] border border-[#F9DFDF]">
+                                            <div className="flex items-center gap-3">
+                                                <span className={`w-7 h-7 rounded-xl flex items-center justify-center font-black text-xs ${
+                                                    i === 0 ? "bg-amber-400 text-white" :
+                                                    i === 1 ? "bg-slate-300 text-slate-800" :
+                                                    i === 2 ? "bg-amber-700 text-white" : "bg-[#FBEFEF] text-[#8C7777]"
+                                                }`}>
+                                                    {i + 1}
+                                                </span>
+                                                <div>
+                                                    <p className="font-black text-sm text-[#2D2525]">{u.username}</p>
+                                                    <p className="text-[11px] text-[#8C7777]">Lv.{u.level} • {u.title_fa}</p>
+                                                </div>
+                                            </div>
+                                            <div className="text-end">
+                                                <p className="font-black text-sm text-[#2D2525]">{u.total_study_hours} {t("hours_short")}</p>
+                                                <p className="text-[11px] text-[#8C7777]">🪙 {u.total_coins_earned}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </main>
+
+                {/* Mobile Bottom Navigation Bar */}
+                <div className="md:hidden bg-white border-t border-[#F9DFDF] h-16 flex items-center justify-around px-2 z-30">
+                    {[
+                        { id: "dashboard", icon: "🏠", label: t("nav_dashboard") },
+                        { id: "study", icon: "⏱️", label: t("nav_study") },
+                        { id: "friends", icon: "👥", label: t("nav_friends") },
+                        { id: "shop", icon: "🛍️", label: t("nav_shop") },
+                        { id: "referrals", icon: "🎁", label: t("nav_referrals") }
+                    ].map(item => (
+                        <button
+                            key={item.id}
+                            onClick={() => setActiveTab(item.id)}
+                            className={`flex flex-col items-center justify-center p-1 ${
+                                activeTab === item.id ? "text-[#E59898]" : "text-[#8C7777]"
+                            }`}
+                        >
+                            <span className="text-lg">{item.icon}</span>
+                            <span className="text-[10px] font-bold">{item.label}</span>
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {/* Session Completed Celebration Modal (Matching Reference Image 1) */}
+            {completedModal && (
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-4xl p-8 max-w-sm w-full border border-[#F9DFDF] shadow-2xl text-center space-y-6">
+                        <div className="h-44">
+                            <MintiCharacter3D
+                                state="completed"
+                                equippedHat={user ? user.equipped_hat : null}
+                                equippedGlasses={user ? user.equipped_glasses : null}
+                                equippedOutfit={user ? user.equipped_outfit : "classic"}
+                                equippedAccessory={user ? user.equipped_accessory : "sprout"}
+                                equippedJewelry={user ? user.equipped_jewelry : null}
+                                size="md"
+                            />
+                        </div>
+                        <div>
+                            <h4 className="text-xl font-black text-[#2D2525]">{t("session_completed_title")}</h4>
+                            <div className="flex items-center justify-center gap-4 mt-3">
+                                <span className="px-4 py-2 rounded-2xl bg-amber-50 text-amber-700 font-black text-sm">
+                                    ⭐ +{completedModal.xp_earned} XP
+                                </span>
+                                <span className="px-4 py-2 rounded-2xl bg-yellow-50 text-yellow-700 font-black text-sm">
+                                    🪙 +{completedModal.coins_earned} سکه
+                                </span>
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => setCompletedModal(null)}
+                            className="sm-btn-primary w-full py-3.5 text-sm"
+                        >
+                            {t("session_completed_btn")}
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Achievement Card Modal (Matching Section 14) */}
+            {showAchievementModal && (
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-4xl p-8 max-w-sm w-full border border-[#F9DFDF] shadow-2xl text-center space-y-6">
+                        <div className="p-6 rounded-3xl bg-gradient-to-br from-[#FCF8F8] to-[#FBEFEF] border border-[#F5AFAF] space-y-4 shadow-sm">
+                            <div className="h-36">
+                                <MintiCharacter3D
+                                    state="completed"
+                                    equippedHat={user ? user.equipped_hat : null}
+                                    equippedGlasses={user ? user.equipped_glasses : null}
+                                    equippedOutfit={user ? user.equipped_outfit : "classic"}
+                                    equippedAccessory={user ? user.equipped_accessory : "sprout"}
+                                    equippedJewelry={user ? user.equipped_jewelry : null}
+                                    size="sm"
+                                    interactive={false}
+                                />
+                            </div>
+                            <div>
+                                <h4 className="text-xl font-black text-[#2D2525]">{user ? user.username : ""}</h4>
+                                <p className="text-xs font-bold text-[#8C7777] mt-0.5">همراه وفادار: {user ? user.character_name : "Minti"} 🌱</p>
+                            </div>
+                            <div className="flex items-center justify-around py-2 border-t border-b border-[#F9DFDF] text-xs font-bold">
+                                <div>
+                                    <p className="text-[#8C7777]">سطح</p>
+                                    <p className="text-sm font-black text-[#2D2525]">Lv.{stats ? stats.level : 1}</p>
+                                </div>
+                                <div>
+                                    <p className="text-[#8C7777]">استریک</p>
+                                    <p className="text-sm font-black text-rose-500">🔥 {stats ? stats.current_streak : 0} روز</p>
+                                </div>
+                                <div>
+                                    <p className="text-[#8C7777]">کل مطالعه</p>
+                                    <p className="text-sm font-black text-[#2D2525]">{stats ? stats.total_study_hours : 0}h</p>
+                                </div>
+                            </div>
+                            <p className="text-[11px] text-[#8C7777] font-semibold">StudyMate • Small Steps, Big Dreams</p>
+                        </div>
+
+                        <div className="flex items-center justify-center gap-3">
+                            <button
+                                onClick={() => {
+                                    const shareText = `من در استادی‌میت با همراهی ${user ? user.character_name : "Minti"} به استریک ${stats ? stats.current_streak : 0} روزه و سطح ${stats ? stats.level : 1} رسیدم! 🎉🌱`;
+                                    navigator.clipboard.writeText(shareText);
+                                    notify("متن دستاورد کپی شد!", "success");
+                                }}
+                                className="sm-btn-primary flex-1 text-xs py-3"
+                            >
+                                کپی متن دستاورد 📋
+                            </button>
+                            <button
+                                onClick={() => setShowAchievementModal(false)}
+                                className="sm-btn-secondary px-5 py-3 text-xs"
+                            >
+                                بستن
+                            </button>
                         </div>
                     </div>
-                )}
-            </main>
+                </div>
+            )}
+
+            {/* Character Name Edit Modal */}
+            {showNameModal && (
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-3xl p-6 max-w-sm w-full border border-[#F9DFDF] shadow-xl space-y-4">
+                        <h4 className="font-black text-base text-[#2D2525]">{t("minti_name_prompt")}</h4>
+                        <input
+                            type="text"
+                            value={charNameInput}
+                            onChange={(e) => setCharNameInput(e.target.value)}
+                            maxLength={25}
+                            className="w-full px-4 py-2.5 rounded-2xl bg-[#FBEFEF] border border-[#F9DFDF] text-sm font-bold text-[#2D2525] focus:outline-none"
+                        />
+                        <div className="flex items-center justify-end gap-2 pt-2">
+                            <button onClick={() => setShowNameModal(false)} className="sm-btn-secondary text-xs px-4 py-2">انصراف</button>
+                            <button onClick={handleSaveCharacterName} className="sm-btn-primary text-xs px-5 py-2">ذخیره</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Auth Modal (Matching Reference Image 2 Top Left) */}
+            {showAuthModal && (
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-4xl p-8 max-w-md w-full border border-[#F9DFDF] shadow-2xl space-y-6">
+                        <div className="text-center space-y-2">
+                            <div className="w-14 h-14 rounded-3xl bg-[#F5AFAF] mx-auto flex items-center justify-center text-2xl shadow-soft">
+                                🌱
+                            </div>
+                            <h3 className="text-2xl font-black text-[#2D2525]">{t("auth_welcome")}</h3>
+                            <p className="text-xs text-[#8C7777]">{t("auth_welcome_sub")}</p>
+                        </div>
+
+                        {/* Tabs */}
+                        <div className="flex bg-[#FBEFEF] p-1.5 rounded-2xl">
+                            <button
+                                onClick={() => setAuthMode("login")}
+                                className={`flex-1 py-2 text-xs font-black rounded-xl transition-all ${authMode === "login" ? "bg-white text-[#2D2525] shadow-sm" : "text-[#8C7777]"}`}
+                            >
+                                {t("auth_login_tab")}
+                            </button>
+                            <button
+                                onClick={() => setAuthMode("register")}
+                                className={`flex-1 py-2 text-xs font-black rounded-xl transition-all ${authMode === "register" ? "bg-white text-[#2D2525] shadow-sm" : "text-[#8C7777]"}`}
+                            >
+                                {t("auth_register_tab")}
+                            </button>
+                        </div>
+
+                        {/* Login Form */}
+                        {authMode === "login" && (
+                            <form onSubmit={handleLogin} className="space-y-4">
+                                <input
+                                    type="text"
+                                    required
+                                    placeholder={t("username")}
+                                    value={authForm.username}
+                                    onChange={(e) => setAuthForm({ ...authForm, username: e.target.value })}
+                                    className="w-full px-4 py-3 rounded-2xl bg-[#FBEFEF] border border-[#F9DFDF] text-xs font-bold text-[#2D2525] focus:outline-none"
+                                />
+                                <input
+                                    type="password"
+                                    required
+                                    placeholder={t("password")}
+                                    value={authForm.password}
+                                    onChange={(e) => setAuthForm({ ...authForm, password: e.target.value })}
+                                    className="w-full px-4 py-3 rounded-2xl bg-[#FBEFEF] border border-[#F9DFDF] text-xs font-bold text-[#2D2525] focus:outline-none"
+                                />
+                                <button type="submit" className="sm-btn-primary w-full py-3.5 text-xs">
+                                    {t("login_cta")}
+                                </button>
+                                <div className="text-center">
+                                    <button
+                                        type="button"
+                                        onClick={() => setAuthMode("forgot")}
+                                        className="text-xs text-[#8C7777] hover:text-[#2D2525] font-semibold"
+                                    >
+                                        {t("forgot_password_link")}
+                                    </button>
+                                </div>
+                            </form>
+                        )}
+
+                        {/* Register Form (Username, Password, Confirm Password, Date of Birth, Referral Code) */}
+                        {authMode === "register" && (
+                            <form onSubmit={handleRegister} className="space-y-3.5">
+                                <input
+                                    type="text"
+                                    required
+                                    placeholder={t("username")}
+                                    value={authForm.username}
+                                    onChange={(e) => setAuthForm({ ...authForm, username: e.target.value })}
+                                    className="w-full px-4 py-3 rounded-2xl bg-[#FBEFEF] border border-[#F9DFDF] text-xs font-bold text-[#2D2525] focus:outline-none"
+                                />
+                                <input
+                                    type="password"
+                                    required
+                                    placeholder={t("password")}
+                                    value={authForm.password}
+                                    onChange={(e) => setAuthForm({ ...authForm, password: e.target.value })}
+                                    className="w-full px-4 py-3 rounded-2xl bg-[#FBEFEF] border border-[#F9DFDF] text-xs font-bold text-[#2D2525] focus:outline-none"
+                                />
+                                <input
+                                    type="password"
+                                    required
+                                    placeholder={t("confirm_password")}
+                                    value={authForm.confirm_password}
+                                    onChange={(e) => setAuthForm({ ...authForm, confirm_password: e.target.value })}
+                                    className="w-full px-4 py-3 rounded-2xl bg-[#FBEFEF] border border-[#F9DFDF] text-xs font-bold text-[#2D2525] focus:outline-none"
+                                />
+                                <div>
+                                    <label className="block text-[11px] font-bold text-[#8C7777] mb-1">{t("date_of_birth")}</label>
+                                    <input
+                                        type="date"
+                                        required
+                                        value={authForm.date_of_birth}
+                                        onChange={(e) => setAuthForm({ ...authForm, date_of_birth: e.target.value })}
+                                        className="w-full px-4 py-2.5 rounded-2xl bg-[#FBEFEF] border border-[#F9DFDF] text-xs font-bold text-[#2D2525] focus:outline-none"
+                                    />
+                                </div>
+                                <input
+                                    type="text"
+                                    placeholder={t("referral_code_optional")}
+                                    value={authForm.referral_code}
+                                    onChange={(e) => setAuthForm({ ...authForm, referral_code: e.target.value })}
+                                    className="w-full px-4 py-3 rounded-2xl bg-[#FBEFEF] border border-[#F9DFDF] text-xs font-bold text-[#2D2525] focus:outline-none"
+                                />
+                                <button type="submit" className="sm-btn-primary w-full py-3.5 text-xs">
+                                    {t("register_cta")}
+                                </button>
+                            </form>
+                        )}
+
+                        {/* Forgot Password Flow */}
+                        {authMode === "forgot" && (
+                            <div className="space-y-4">
+                                <p className="text-xs text-[#8C7777]">{t("forgot_password_desc")}</p>
+                                <input
+                                    type="text"
+                                    placeholder={t("username")}
+                                    value={authForm.username}
+                                    onChange={(e) => setAuthForm({ ...authForm, username: e.target.value })}
+                                    className="w-full px-4 py-3 rounded-2xl bg-[#FBEFEF] border border-[#F9DFDF] text-xs font-bold text-[#2D2525] focus:outline-none"
+                                />
+                                <button onClick={handleForgotPassword} className="sm-btn-secondary w-full py-2.5 text-xs">
+                                    {t("send_recovery_code")}
+                                </button>
+
+                                {forgotToken && (
+                                    <form onSubmit={handleResetPassword} className="space-y-3 pt-3 border-t border-[#FBEFEF]">
+                                        <input
+                                            type="text"
+                                            required
+                                            placeholder={t("reset_token_label")}
+                                            value={forgotToken}
+                                            onChange={(e) => setForgotToken(e.target.value)}
+                                            className="w-full px-4 py-2.5 rounded-2xl bg-[#FBEFEF] border border-[#F9DFDF] text-xs font-bold text-[#2D2525]"
+                                        />
+                                        <input
+                                            type="password"
+                                            required
+                                            placeholder={t("new_password_label")}
+                                            value={newPassword}
+                                            onChange={(e) => setNewPassword(e.target.value)}
+                                            className="w-full px-4 py-2.5 rounded-2xl bg-[#FBEFEF] border border-[#F9DFDF] text-xs font-bold text-[#2D2525]"
+                                        />
+                                        <input
+                                            type="password"
+                                            required
+                                            placeholder={t("confirm_password")}
+                                            value={newPasswordConfirm}
+                                            onChange={(e) => setNewPasswordConfirm(e.target.value)}
+                                            className="w-full px-4 py-2.5 rounded-2xl bg-[#FBEFEF] border border-[#F9DFDF] text-xs font-bold text-[#2D2525]"
+                                        />
+                                        <button type="submit" className="sm-btn-primary w-full py-3 text-xs">
+                                            {t("reset_password_btn")}
+                                        </button>
+                                    </form>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

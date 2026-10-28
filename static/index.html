@@ -1,19 +1,59 @@
-﻿<!DOCTYPE html>
-<html lang="fa" dir="rtl" class="dark">
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>StudyMate OS | Gamified Focus & AI Coach</title>
+    <title>StudyMate | Small Steps, Big Dreams</title>
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
+    <link rel="alternate icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" href="/static/favicon.svg" />
+    <!-- Tailwind CSS with custom StudyMate tokens -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
-        tailwind.config = { darkMode: 'class' };
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        studymate: {
+                            bg: 'var(--sm-bg)',
+                            surface: 'var(--sm-surface)',
+                            card: 'var(--sm-card)',
+                            accent: 'var(--sm-accent)',
+                            accentDark: 'var(--sm-accent-hover)',
+                            text: 'var(--sm-text)',
+                            muted: 'var(--sm-muted)',
+                            border: 'var(--sm-border)'
+                        }
+                    },
+                    borderRadius: {
+                        '2xl': '1.25rem',
+                        '3xl': '1.75rem',
+                        '4xl': '2.25rem'
+                    },
+                    boxShadow: {
+                        'soft': 'var(--sm-shadow)',
+                        'card': 'var(--sm-card-shadow)',
+                        'glow': '0 0 25px rgba(245, 175, 175, 0.45)'
+                    }
+                }
+            }
+        };
     </script>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/styles.css" />
+    <!-- Three.js for Real 3D Animated Minti Companion -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- React 18, ReactDOM 18, Babel -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
-<body>
+<body class="bg-studymate-bg text-studymate-text antialiased selection:bg-[#F5AFAF] selection:text-white min-h-screen">
     <div id="root"></div>
     <script src="/static/js/i18n.js"></script>
     <script type="text/babel" src="/static/js/app.jsx"></script>

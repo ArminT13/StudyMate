@@ -1,253 +1,350 @@
-﻿@import url('//fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700;800&family=Vazirmatn:wght@400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap');
 
-:root {
-    --bg-base: #f4f6fb;
-    --bg-surface: rgba(255, 255, 255, 0.88);
-    --bg-elevated: rgba(241, 245, 249, 0.9);
-    --text-main: #09090b;
-    --text-muted: #64748b;
-    --border-subtle: rgba(15, 23, 42, 0.09);
-    --specular-top: rgba(255, 255, 255, 0.7);
-    --accent-primary: #8b5cf6;
-    --accent-secondary: #06b6d4;
-    --accent-glow: rgba(139, 92, 246, 0.38);
+:root, [data-user-theme="default"] {
+    /* StudyMate Signature Primary Soft Pink Palette */
+    --sm-bg: #FCF8F8;
+    --sm-surface: #FBEFEF;
+    --sm-card: #F9DFDF;
+    --sm-accent: #F5AFAF;
+    --sm-accent-hover: #E89E9E;
+    --sm-text: #2D2525;
+    --sm-text-secondary: #5A4A4A;
+    --sm-muted: #8C7777;
+    --sm-border: rgba(245, 175, 175, 0.4);
+    --sm-card-border: rgba(249, 223, 223, 0.7);
+    --sm-shadow: 0 10px 30px -5px rgba(245, 175, 175, 0.25);
+    --sm-card-shadow: 0 4px 20px -2px rgba(230, 180, 180, 0.15);
 }
 
+/* ================= UNLOCKABLE THEMES ================= */
+
+[data-user-theme="jungle"] {
+    --sm-accent: #4ade80;
+    --sm-accent-hover: #22c55e;
+    --sm-card: #dcfce7;
+    --sm-surface: #f0fdf4;
+    --sm-bg: #f7fee7;
+    --sm-text: #14351e;
+    --sm-text-secondary: #275233;
+    --sm-muted: #52795e;
+    --sm-border: rgba(74, 222, 128, 0.4);
+    --sm-card-border: rgba(187, 247, 208, 0.8);
+    --sm-shadow: 0 10px 30px -5px rgba(74, 222, 128, 0.25);
+    --sm-card-shadow: 0 4px 20px -2px rgba(74, 222, 128, 0.15);
+}
+
+[data-user-theme="night"] {
+    --sm-accent: #818cf8;
+    --sm-accent-hover: #6366f1;
+    --sm-card: #e0e7ff;
+    --sm-surface: #eef2ff;
+    --sm-bg: #f8fafc;
+    --sm-text: #1e1b4b;
+    --sm-text-secondary: #312e81;
+    --sm-muted: #6366f1;
+    --sm-border: rgba(129, 140, 248, 0.4);
+    --sm-card-border: rgba(199, 210, 254, 0.8);
+    --sm-shadow: 0 10px 30px -5px rgba(129, 140, 248, 0.25);
+    --sm-card-shadow: 0 4px 20px -2px rgba(129, 140, 248, 0.15);
+}
+
+[data-user-theme="spring"] {
+    --sm-accent: #f472b6;
+    --sm-accent-hover: #ec4899;
+    --sm-card: #fce7f3;
+    --sm-surface: #fdf2f8;
+    --sm-bg: #fff1f2;
+    --sm-text: #4a1d35;
+    --sm-text-secondary: #702550;
+    --sm-muted: #9d4876;
+    --sm-border: rgba(244, 114, 182, 0.4);
+    --sm-card-border: rgba(251, 207, 232, 0.8);
+    --sm-shadow: 0 10px 30px -5px rgba(244, 114, 182, 0.25);
+    --sm-card-shadow: 0 4px 20px -2px rgba(244, 114, 182, 0.15);
+}
+
+[data-user-theme="snow"] {
+    --sm-accent: #38bdf8;
+    --sm-accent-hover: #0ea5e9;
+    --sm-card: #e0f2fe;
+    --sm-surface: #f0f9ff;
+    --sm-bg: #f8fafc;
+    --sm-text: #082f49;
+    --sm-text-secondary: #0c4a6e;
+    --sm-muted: #38bdf8;
+    --sm-border: rgba(56, 189, 248, 0.4);
+    --sm-card-border: rgba(186, 230, 253, 0.8);
+    --sm-shadow: 0 10px 30px -5px rgba(56, 189, 248, 0.25);
+    --sm-card-shadow: 0 4px 20px -2px rgba(56, 189, 248, 0.15);
+}
+
+[data-user-theme="space"] {
+    --sm-accent: #a855f7;
+    --sm-accent-hover: #9333ea;
+    --sm-card: #f3e8ff;
+    --sm-surface: #faf5ff;
+    --sm-bg: #fdf4ff;
+    --sm-text: #3b0764;
+    --sm-text-secondary: #581c87;
+    --sm-muted: #a855f7;
+    --sm-border: rgba(168, 85, 247, 0.4);
+    --sm-card-border: rgba(233, 213, 255, 0.8);
+    --sm-shadow: 0 10px 30px -5px rgba(168, 85, 247, 0.25);
+    --sm-card-shadow: 0 4px 20px -2px rgba(168, 85, 247, 0.15);
+}
+
+/* ================= UNIVERSAL THEME-AWARE SURFACES ================= */
+[data-user-theme] .bg-\[\#FCF8F8\],
+.bg-studymate-bg {
+    background-color: var(--sm-bg) !important;
+}
+
+[data-user-theme] .bg-\[\#FBEFEF\],
+.bg-studymate-surface {
+    background-color: var(--sm-surface) !important;
+}
+
+[data-user-theme] .bg-\[\#F9DFDF\],
+.bg-studymate-card {
+    background-color: var(--sm-card) !important;
+}
+
+[data-user-theme] .bg-\[\#F5AFAF\],
+.bg-studymate-accent {
+    background-color: var(--sm-accent) !important;
+}
+
+[data-user-theme] .border-\[\#F9DFDF\],
+.border-studymate-card {
+    border-color: var(--sm-card-border) !important;
+}
+
+[data-user-theme] .border-\[\#FBEFEF\],
+.border-studymate-surface {
+    border-color: var(--sm-border) !important;
+}
+
+[data-user-theme] .border-\[\#F5AFAF\],
+.border-studymate-accent {
+    border-color: var(--sm-accent) !important;
+}
+
+[data-user-theme] .text-\[\#2D2525\],
+.text-studymate-text {
+    color: var(--sm-text) !important;
+}
+
+[data-user-theme] .text-\[\#5A4A4A\],
+[data-user-theme] .text-\[\#8C7777\],
+.text-studymate-muted {
+    color: var(--sm-muted) !important;
+}
+
+/* Optional Dark Mode if explicitly toggled */
 html.dark {
-    /* مشکی عمیق اوبر و زغالی ابریشمی مطابق استاندارد Cyber-SaaS */
-    --bg-base: #09090b;
-    --bg-surface: rgba(13, 15, 23, 0.78);
-    --bg-elevated: rgba(20, 23, 34, 0.85);
-    --text-main: #f8fafc;
-    --text-muted: #94a3b8;
-    --border-subtle: rgba(255, 255, 255, 0.08);
-    --specular-top: rgba(255, 255, 255, 0.14);
+    --sm-bg: #1C1919;
+    --sm-surface: #272222;
+    --sm-card: #352D2D;
+    --sm-accent: #F5AFAF;
+    --sm-accent-hover: #FFAFAF;
+    --sm-text: #FDFBFB;
+    --sm-text-secondary: #E3D8D8;
+    --sm-muted: #A89595;
+    --sm-border: rgba(245, 175, 175, 0.25);
+    --sm-card-border: rgba(255, 255, 255, 0.08);
+    --sm-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.5);
+    --sm-card-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.35);
 }
 
-/* ================= 8 ANIME / GAMING / CINEMA THEMES ================= */
+/* ================= TYPOGRAPHY & LAYOUT ================= */
 
-[data-user-theme="default"] {
-    --accent-primary: #8b5cf6;
-    --accent-secondary: #06b6d4;
-    --accent-glow: rgba(139, 92, 246, 0.42);
+html[dir="rtl"] {
+    font-family: 'Vazirmatn', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
-[data-user-theme="dracula"] {
-    --accent-primary: #a855f7;
-    --accent-secondary: #ec4899;
-    --accent-glow: rgba(168, 85, 247, 0.52);
+html[dir="ltr"] {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
-[data-user-theme="forest_emerald"] {
-    --accent-primary: #10b981;
-    --accent-secondary: #047857;
-    --accent-glow: rgba(16, 185, 129, 0.45);
-}
-
-[data-user-theme="miku_vocaloid"] {
-    --accent-primary: #06b6d4;
-    --accent-secondary: #ec4899;
-    --accent-glow: rgba(6, 182, 212, 0.55);
-}
-
-[data-user-theme="hollow_void"] {
-    --accent-primary: #38bdf8;
-    --accent-secondary: #818cf8;
-    --accent-glow: rgba(56, 189, 248, 0.5);
-}
-
-[data-user-theme="cyberpunk_amber"] {
-    --accent-primary: #facc15;
-    --accent-secondary: #06b6d4;
-    --accent-glow: rgba(250, 204, 21, 0.55);
-}
-
-[data-user-theme="akatsuki_crimson"] {
-    --accent-primary: #ef4444;
-    --accent-secondary: #991b1b;
-    --accent-glow: rgba(239, 68, 68, 0.55);
-}
-
-[data-user-theme="clair_obscur"] {
-    --accent-primary: #f59e0b;
-    --accent-secondary: #fde047;
-    --accent-glow: rgba(245, 158, 11, 0.65);
-}
-
-/* ================= AURA SURFACES ================= */
-.aura-default { background: linear-gradient(135deg, #18181b 0%, #1e1b4b 60%, #0f172a 100%); border: 1px solid rgba(139, 92, 246, 0.45); }
-.aura-dracula { background: linear-gradient(135deg, #3b0764 0%, #831843 60%, #09090b 100%); border: 1px solid #f472b6; box-shadow: 0 0 25px rgba(168,85,247,0.35); }
-.aura-forest_emerald { background: linear-gradient(135deg, #022c22 0%, #065f46 60%, #09090b 100%); border: 1px solid #34d399; box-shadow: 0 0 25px rgba(16,185,129,0.35); }
-.aura-miku_vocaloid { background: linear-gradient(135deg, #083344 0%, #0e7490 50%, #9d174d 100%); border: 1px solid #22d3ee; box-shadow: 0 0 25px rgba(6,182,212,0.45); }
-.aura-hollow_void { background: linear-gradient(135deg, #09090b 0%, #1e1b4b 55%, #0284c7 100%); border: 1px solid #7dd3fc; box-shadow: 0 0 25px rgba(56,189,248,0.45); }
-.aura-cyberpunk_amber { background: linear-gradient(135deg, #713f12 0%, #09090b 55%, #155e75 100%); border: 1px solid #fde047; box-shadow: 0 0 25px rgba(250,204,21,0.45); }
-.aura-akatsuki_crimson { background: linear-gradient(135deg, #09090b 0%, #450a0a 55%, #b91c1c 100%); border: 1px solid #f87171; box-shadow: 0 0 25px rgba(239,68,68,0.5); }
-.aura-clair_obscur { background: linear-gradient(135deg, #0c0a09 0%, #451a03 50%, #b45309 100%); border: 1px solid #fde047; box-shadow: 0 0 30px rgba(245,158,11,0.6); }
-
-html[dir="rtl"] body { font-family: 'Vazirmatn', sans-serif; }
-html[dir="ltr"] body { font-family: 'Inter', sans-serif; }
-.font-display { font-family: 'Space Grotesk', 'Vazirmatn', sans-serif; }
-
-/* ================= AMBIENT GRID & PARTICLES BACKGROUND ================= */
 body {
-    background-color: var(--bg-base);
-    color: var(--text-main);
-    /* شبکه شطرنجی و ماتریسی با شفافیت ۵٪ */
-    background-image: 
-        linear-gradient(to right, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-        linear-gradient(to bottom, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-        radial-gradient(circle at 50% -10%, var(--accent-glow), transparent 60%);
-    background-size: 36px 36px, 36px 36px, 100% 100%;
+    background-color: var(--sm-bg);
+    color: var(--sm-text);
     transition: background-color 0.3s ease, color 0.3s ease;
-    overflow-x: hidden;
 }
 
-@keyframes float-ember {
-    0% { transform: translateY(0px) translateX(0px) scale(0.8); opacity: 0; }
-    25% { opacity: 0.55; }
-    75% { opacity: 0.45; }
-    100% { transform: translateY(-120px) translateX(20px) scale(1.2); opacity: 0; }
+/* ================= CUSTOM CARD & CONTAINER UTILITIES ================= */
+
+.sm-card {
+    background-color: #FFFFFF;
+    border: 1px solid var(--sm-border);
+    border-radius: 1.75rem;
+    box-shadow: var(--sm-card-shadow);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.ambient-ember {
-    position: fixed;
-    border-radius: 9999px;
-    pointer-events: none;
-    z-index: 0;
-    filter: blur(1px);
-    animation: float-ember linear infinite;
+.sm-card-pink {
+    background-color: var(--sm-card);
+    border: 1px solid var(--sm-border);
+    border-radius: 1.75rem;
+    box-shadow: var(--sm-card-shadow);
 }
 
-/* ================= BENTO GLASSMORPHISM & RIM LIGHTING ================= */
-.bento-card {
-    background: var(--bg-surface);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid var(--border-subtle);
-    box-shadow: 
-        0 14px 40px -12px rgba(0, 0, 0, 0.5),
-        inset 0 1px 0 0 var(--specular-top);
+.sm-surface {
+    background-color: var(--sm-surface);
+    border: 1px solid var(--sm-border);
+    border-radius: 1.5rem;
+}
+
+.sm-btn-primary {
+    background-color: var(--sm-accent);
+    color: #2D2525;
+    font-weight: 700;
     border-radius: 1.25rem;
-    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s ease, box-shadow 0.25s ease;
+    padding: 0.75rem 1.75rem;
+    transition: all 0.2s ease;
+    box-shadow: 0 6px 16px -2px rgba(245, 175, 175, 0.45);
 }
 
-.bento-card:hover {
-    border-color: rgba(255, 255, 255, 0.16);
+.sm-btn-primary:hover {
+    background-color: var(--sm-accent-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 8px 20px -2px rgba(245, 175, 175, 0.55);
 }
 
-/* Rim Lighting: تپش نوری گدازه‌ای برای باس‌فایت */
-@keyframes pulse-boss-rim {
-    0%, 100% { box-shadow: 0 0 25px -5px rgba(239, 68, 68, 0.35), inset 0 1px 0 0 rgba(248, 113, 113, 0.35); border-color: rgba(239, 68, 68, 0.45); }
-    50% { box-shadow: 0 0 40px -2px rgba(249, 115, 22, 0.55), inset 0 1px 0 0 rgba(251, 146, 60, 0.6); border-color: rgba(249, 115, 22, 0.75); }
+.sm-btn-secondary {
+    background-color: var(--sm-surface);
+    color: var(--sm-text);
+    border: 1px solid var(--sm-border);
+    font-weight: 600;
+    border-radius: 1.25rem;
+    padding: 0.75rem 1.5rem;
+    transition: all 0.2s ease;
 }
 
-.rim-light-boss {
-    animation: pulse-boss-rim 3.5s infinite ease-in-out;
+.sm-btn-secondary:hover {
+    background-color: var(--sm-card);
 }
 
-/* Rim Lighting: تپش نئونی برای هوش مصنوعی و کوئست‌ها */
-.rim-light-ai {
-    border: 1px solid rgba(139, 92, 246, 0.4);
-    box-shadow: 0 0 30px -8px var(--accent-glow), inset 0 1px 0 0 rgba(167, 139, 250, 0.3);
+/* Circular Timer SVG styling */
+.sm-timer-ring-bg {
+    stroke: rgba(245, 175, 175, 0.25);
+    stroke-linecap: round;
 }
 
-/* ================= METALLIC BADGES & RPG BUTTONS ================= */
-.metallic-gold-badge {
-    background: linear-gradient(135deg, #fef08a 0%, #f59e0b 50%, #b45309 100%);
-    color: #09090b;
-    font-weight: 900;
-    box-shadow: 0 0 15px rgba(245, 158, 11, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+.sm-timer-ring-fill {
+    stroke: var(--sm-accent);
+    stroke-linecap: round;
+    transform: rotate(-90deg);
+    transform-origin: 50% 50%;
+    transition: stroke-dashoffset 0.8s ease;
 }
 
-.metallic-platinum-badge {
-    background: linear-gradient(135deg, #f8fafc 0%, #94a3b8 50%, #475569 100%);
-    color: #09090b;
-    font-weight: 900;
-    box-shadow: 0 0 12px rgba(148, 163, 184, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+/* 3D Character Canvas Container */
+.character-canvas-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-height: 240px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: grab;
+    user-select: none;
+    touch-action: none;
 }
 
-.tactile-btn {
-    background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
-    color: #ffffff;
-    font-weight: 800;
-    border-top: 1px solid rgba(255, 255, 255, 0.35);
-    border-bottom: 3px solid rgba(0, 0, 0, 0.45);
-    box-shadow: 0 6px 22px -4px var(--accent-glow);
-    transition: all 0.18s ease;
+.character-canvas-container:active {
+    cursor: grabbing;
 }
 
-.tactile-btn:hover:not(:disabled) {
-    transform: translateY(-2px);
-    filter: brightness(1.12);
-    box-shadow: 0 10px 28px -3px var(--accent-glow);
+.character-canvas-container canvas {
+    outline: none;
+    display: block;
 }
 
-/* دکمه حمله گدازه‌ای (Attack Button) */
-.attack-btn {
-    background: linear-gradient(135deg, #dc2626 0%, #ea580c 50%, #f59e0b 100%);
-    color: #ffffff;
-    font-weight: 900;
-    border-top: 1px solid rgba(254, 215, 170, 0.6);
-    border-bottom: 3px solid #7f1d1d;
-    box-shadow: 0 8px 28px -4px rgba(239, 68, 68, 0.65);
-    transition: all 0.18s ease;
-}
-
-.attack-btn:hover {
-    transform: translateY(-2px) scale(1.02);
-    box-shadow: 0 12px 35px -2px rgba(249, 115, 22, 0.85);
-    filter: brightness(1.1);
-}
-
-.attack-btn:active {
-    transform: translateY(1px) scale(0.99);
-}
-
-/* ================= BOSS DAMAGE SHAKE & PARTICLE BURST ================= */
-@keyframes boss-hit-shake {
-    0%, 100% { transform: translate(0, 0) rotate(0deg); }
-    15% { transform: translate(-8px, -4px) rotate(-1.5deg); filter: brightness(1.6) saturate(1.8); }
-    30% { transform: translate(8px, 3px) rotate(1.5deg); }
-    45% { transform: translate(-6px, 2px) rotate(-1deg); }
-    60% { transform: translate(6px, -2px) rotate(1deg); }
-    75% { transform: translate(-3px, 1px) rotate(0deg); }
-}
-
-.boss-shake {
-    animation: boss-hit-shake 0.48s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
-}
-
-@keyframes damage-float-up {
-    0% { opacity: 1; transform: translateY(0) scale(0.7); }
-    40% { opacity: 1; transform: translateY(-28px) scale(1.25); }
-    100% { opacity: 0; transform: translateY(-55px) scale(0.9); }
-}
-
-.damage-pop {
-    animation: damage-float-up 0.95s ease-out forwards;
+/* Subtle pedestal floor shadow under 3D character */
+.character-pedestal-shadow {
+    position: absolute;
+    bottom: 12px;
+    width: 140px;
+    height: 24px;
+    background: radial-gradient(ellipse at center, rgba(220, 160, 160, 0.45) 0%, rgba(245, 175, 175, 0.15) 50%, transparent 75%);
+    border-radius: 50%;
     pointer-events: none;
+    z-index: 1;
 }
 
-@keyframes particle-fly {
-    0% { opacity: 1; transform: translate(0, 0) scale(1); }
-    100% { opacity: 0; transform: translate(var(--tx), var(--ty)) scale(0); }
+/* Speech bubble tooltip */
+.speech-bubble {
+    position: absolute;
+    top: -12px;
+    right: 10%;
+    background: #FFFFFF;
+    color: #2D2525;
+    padding: 6px 14px;
+    border-radius: 1rem;
+    font-size: 0.825rem;
+    font-weight: 700;
+    box-shadow: 0 4px 15px rgba(245, 175, 175, 0.35);
+    border: 1px solid #F9DFDF;
+    white-space: nowrap;
+    animation: floatSpeech 3s ease-in-out infinite alternate;
+    pointer-events: none;
+    z-index: 10;
 }
 
-.quest-particle {
-    position: fixed;
-    width: 7px;
-    height: 7px;
+.speech-bubble::after {
+    content: '';
+    position: absolute;
+    bottom: -6px;
+    right: 20px;
+    width: 12px;
+    height: 12px;
+    background: #FFFFFF;
+    border-right: 1px solid #F9DFDF;
+    border-bottom: 1px solid #F9DFDF;
+    transform: rotate(45deg);
+}
+
+@keyframes floatSpeech {
+    0% { transform: translateY(0); }
+    100% { transform: translateY(-4px); }
+}
+
+/* Subtle animations */
+@keyframes pulseSubtle {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.03); opacity: 0.95; }
+}
+
+.animate-pulse-subtle {
+    animation: pulseSubtle 2.5s infinite ease-in-out;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #F5AFAF;
     border-radius: 9999px;
-    pointer-events: none;
-    z-index: 9999;
-    animation: particle-fly 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* Quest Difficulty Badges */
-.badge-easy { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.35); }
-.badge-hard { background: rgba(139, 92, 246, 0.18); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.45); }
-.badge-legendary { background: linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(239, 68, 68, 0.25)); color: #fde047; border: 1px solid rgba(250, 204, 21, 0.6); box-shadow: 0 0 12px rgba(245, 158, 11, 0.3); }
+::-webkit-scrollbar-thumb:hover {
+    background: #E59898;
+}
 
-.text-accent { color: var(--accent-primary); }
-.border-accent { border-color: var(--accent-primary); }
-.bg-elevated { background-color: var(--bg-elevated); }
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
