@@ -871,11 +871,15 @@ function App() {
         document.documentElement.dir = lang === "fa" ? "rtl" : "ltr";
     }, [lang]);
 
-    // API Helper
+    // API Helper with dynamic base URL support (for decoupled hosting like Netlify + Render/VPS)
     const api = async (endpoint, options = {}) => {
         const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
         if (token) headers["Authorization"] = `Bearer ${token}`;
-        const res = await fetch(endpoint, { ...options, headers });
+        const base = (window.__STUDYMATE_API_BASE__ || localStorage.getItem("studymate_api_base") || "").replace(/\/+$/, "");
+        const url = (endpoint.startsWith("http://") || endpoint.startsWith("https://"))
+            ? endpoint
+            : `${base}${endpoint.startsWith("/") ? "" : "/"}${endpoint}`;
+        const res = await fetch(url, { ...options, headers });
         const data = await res.json().catch(() => ({}));
         if (res.status === 401) {
             setShowAuthModal(true);

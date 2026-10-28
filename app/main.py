@@ -7,6 +7,7 @@ import re
 import sqlite3
 from typing import List, Literal, Optional
 from fastapi import FastAPI, HTTPException, Depends, Query, status
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse, FileResponse
 
@@ -34,6 +35,15 @@ app = FastAPI(
     title="StudyMate API",
     description="Gamified Collaborative Study Platform with Animated 3D Minti Companion",
     version="3.0.0"
+)
+
+# Enable CORS for cross-origin deployments (e.g. Netlify frontend + cloud API)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")

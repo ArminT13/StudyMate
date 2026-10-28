@@ -1,0 +1,18 @@
+# Netlify Configuration for StudyMate Frontend
+
+[build]
+  # When deployed on Netlify, publish the static directory containing index.html, assets, and UI code
+  publish = "static"
+
+# Rewrite asset requests prefixed with /static/ to root of publish directory
+# This ensures that both local FastAPI (/static/...) and Netlify (/...) load assets seamlessly
+[[redirects]]
+  from = "/static/*"
+  to = "/:splat"
+  status = 200
+
+# SPA client-side routing fallback
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
